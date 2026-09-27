@@ -1,0 +1,71 @@
+{
+  "name": "shap_review",
+  "version": "0.28.0",
+  "schema_version": "2.9",
+  "description": "Evidence-driven SHAP repository review engine",
+  "commands": [
+    "map",
+    "health",
+    "analyze",
+    "report",
+    "hotspots",
+    "explore",
+    "investigate",
+    "reproduce",
+    "fuzz",
+    "fuzz-treeexplainer",
+    "fuzz-protocol",
+    "fuzz-backends",
+    "differential",
+    "cpu-gpu-differential",
+    "regressions",
+    "history",
+    "sanitizer",
+    "differential-versions",
+    "evidence",
+    "semantic-oracle",
+    "native-map",
+    "api-era",
+    "capabilities",
+    "version"
+  ],
+  "input": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string"
+      },
+      "arguments": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "required": [
+      "command"
+    ]
+  },
+  "output": {
+    "type": "object",
+    "required": [
+      "provider",
+      "schema_version",
+      "command",
+      "result"
+    ]
+  },
+  "evidence_model": {
+    "verdicts": [
+      "STATIC_CANDIDATE",
+      "HISTORICALLY_CORRELATED",
+      "DYNAMICALLY_VALIDATED",
+      "HIGH_CONFIDENCE",
+      "CONFIRMED",
+      "CONFIRMED_MEMORY_SAFETY",
+      "UNVALIDATED"
+    ],
+    "independent_evidence_required_for_confirmation": true,
+    "name": "EvidenceChain",
+    "schema_version": "2.1",
+    "independence_tracking": true
+  }
+}

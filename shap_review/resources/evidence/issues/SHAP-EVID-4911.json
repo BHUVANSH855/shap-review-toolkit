@@ -1,0 +1,23 @@
+{
+  "affected_components": [
+    "TreeExplainer",
+    "Tabular",
+    "_cext"
+  ],
+  "bug_class": "SHAP-05",
+  "expected_behavior": "numeric representation or clear contract rejection.",
+  "fix": "",
+  "fixed_version": "",
+  "id": "SHAP-EVID-4911",
+  "invariant": "INV-INPUT-001",
+  "observed_behavior": "pandas nullable dtype can become object dtype before native numeric processing, producing a TypeError in _cext.",
+  "provenance": "primary",
+  "regression_test": "",
+  "reported_version": "0.51.0",
+  "reproduction": "data/regressions/SHAP-4911/reproduce.py",
+  "source_date": "2026-04-29",
+  "status": "documented",
+  "title": "Nullable pandas dtype reaches TreeExplainer native path",
+  "type": "issue",
+  "url": "https://github.com/shap/shap/issues/4911"
+}

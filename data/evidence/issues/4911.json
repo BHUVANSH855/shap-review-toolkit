@@ -1,0 +1,1 @@
+{"id":"issue-4911","title":"TreeExplainer fails with pandas nullable dtypes in background data","url":"https://github.com/shap/shap/issues/4911","supports":["SHAP-05","INV-INPUT-001"],"status":"open","observation":"nullable pandas background data can become object dtype and reach a native numeric operation expecting float64"}

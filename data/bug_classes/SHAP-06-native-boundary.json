@@ -1,0 +1,1 @@
+{"id":"SHAP-06","name":"Native boundary memory/exception defect","evidence":["cmake-native-architecture"],"primary_components":["_cext","_cutils","_cext_gpu"],"validation":["ASan","UBSan","debug"]}

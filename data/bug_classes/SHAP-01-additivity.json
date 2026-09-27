@@ -1,0 +1,1 @@
+{"id":"SHAP-01","name":"Attribution/additivity violation","evidence":["issue-4869","issue-2778","issue-1539"],"primary_components":["TreeExplainer","Explanation"],"validation":["oracle","differential","fuzz"]}

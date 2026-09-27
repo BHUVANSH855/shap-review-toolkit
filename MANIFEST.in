@@ -1,0 +1,32 @@
+include README.md
+include CHANGELOG.md
+include LICENSE
+recursive-include data *.json
+recursive-include shap_review/resources *.json
+recursive-include docs *.md
+recursive-include plugins *.md
+recursive-include plugins *.json
+recursive-include adapters *.md
+recursive-include adapters *.json
+global-exclude __pycache__/*
+global-exclude *.py[cod]
+global-exclude *.egg-info/*
+
+include adapters/openai/*.json
+include adapters/gemini/*.json
+include plugins/**/*.json
+include plugins/**/*.md
+global-exclude catboost_info/*
+global-exclude .pytest_cache/*
+
+global-exclude **/.out/*
+
+global-exclude .ruff_cache/*
+global-exclude .mypy_cache/*
+global-exclude .pytype/*
+global-exclude .coverage
+global-exclude htmlcov/*
+global-exclude build/*
+global-exclude dist/*
+global-exclude *.log
+global-exclude *.tmp

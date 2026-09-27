@@ -1,0 +1,79 @@
+{
+  "name": "shap_review",
+  "description": "Evidence-driven SHAP repository review toolkit",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "enum": [
+          "map",
+          "health",
+          "analyze",
+          "report",
+          "hotspots",
+          "explore",
+          "investigate",
+          "reproduce",
+          "fuzz",
+          "fuzz-treeexplainer",
+          "fuzz-protocol",
+          "fuzz-backends",
+          "differential",
+          "cpu-gpu-differential",
+          "regressions",
+          "history",
+          "sanitizer",
+          "differential-versions",
+          "evidence",
+          "semantic-oracle",
+          "native-map",
+          "api-era",
+          "capabilities",
+          "version"
+        ]
+      },
+      "arguments": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      }
+    },
+    "required": [
+      "command"
+    ]
+  },
+  "version": "0.28.0",
+  "schema_version": "2.9",
+  "commands": [
+    "map",
+    "health",
+    "analyze",
+    "report",
+    "hotspots",
+    "explore",
+    "investigate",
+    "reproduce",
+    "fuzz",
+    "fuzz-treeexplainer",
+    "fuzz-protocol",
+    "fuzz-backends",
+    "differential",
+    "cpu-gpu-differential",
+    "regressions",
+    "history",
+    "sanitizer",
+    "differential-versions",
+    "evidence",
+    "semantic-oracle",
+    "native-map",
+    "api-era",
+    "capabilities",
+    "version"
+  ],
+  "evidence_model": {
+    "name": "EvidenceChain",
+    "schema_version": "2.1",
+    "independence_tracking": true
+  }
+}

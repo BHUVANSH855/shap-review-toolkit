@@ -1,0 +1,1 @@
+{"id":"issue-4495","title":"TreeExplainer.shap_values mutates expected_value","url":"https://github.com/shap/shap/issues/4495","supports":["SHAP-07","INV-STATE-001","INV-SHAPE-001"],"status":"open","observation":"naive local guarding of mutation sites caused additivity regressions, demonstrating initialization/data-flow coupling"}

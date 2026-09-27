@@ -1,0 +1,1 @@
+{"id":"SHAP-05","name":"Input dtype/native representation mismatch","evidence":["issue-4911"],"primary_components":["TreeExplainer","Tabular","_cext"],"validation":["dtype-oracle","fuzz"]}

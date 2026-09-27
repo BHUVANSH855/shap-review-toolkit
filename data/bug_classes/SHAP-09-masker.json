@@ -1,0 +1,1 @@
+{"id":"SHAP-09","name":"Masker/model/explainer compatibility defect","evidence":["explainer-masker-api-contract"],"primary_components":["Explainer","Masker"],"validation":["dispatch-matrix","dynamic"]}

@@ -1,0 +1,27 @@
+{
+  "affected_components": [
+    "TreeExplainer",
+    "numerical"
+  ],
+  "bug_class": "SHAP-08",
+  "expected_behavior": "Supported behavior should satisfy the documented SHAP contract.",
+  "fix": "",
+  "fixed_version": "",
+  "id": "SHAP-EVID-2778",
+  "invariant": "INV-ATTR-001",
+  "observation": "reported TreeExplainer additivity failures associated with numerical/version/data effects",
+  "observed_behavior": "Historical SHAP issue evidence relevant to the mapped invariant.",
+  "provenance": "primary",
+  "regression_test": "",
+  "reported_version": "",
+  "reproduction": "",
+  "source_date": "",
+  "status": "closed",
+  "supports": [
+    "SHAP-01",
+    "SHAP-08"
+  ],
+  "title": "SHAP additivity check fails only in TreeExplainer",
+  "type": "issue",
+  "url": "https://github.com/shap/shap/issues/2778"
+}

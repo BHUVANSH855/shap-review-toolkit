@@ -1,0 +1,21 @@
+{
+  "affected_components": [
+    "TreeExplainer",
+    "tests"
+  ],
+  "bug_class": "SHAP-01",
+  "expected_behavior": "contract-sensitive combinations have direct assertions.",
+  "fix": "",
+  "fixed_version": "",
+  "id": "SHAP-EVID-4869",
+  "invariant": "INV-ATTR-001",
+  "observed_behavior": "important multiclass/multioutput/additivity combinations lacked direct regression coverage.",
+  "provenance": "primary",
+  "regression_test": "",
+  "reported_version": "",
+  "source_date": "2026-04-20",
+  "status": "documented",
+  "title": "Missing multiclass/multioutput/additivity coverage",
+  "type": "issue",
+  "url": "https://github.com/shap/shap/issues/4869"
+}

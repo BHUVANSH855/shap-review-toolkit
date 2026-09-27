@@ -1,0 +1,1 @@
+{"id":"SHAP-02","name":"Output-space mismatch","evidence":["issue-5098","issue-5014"],"primary_components":["TreeExplainer","TreeEnsemble"],"validation":["semantic-trace","dynamic"]}

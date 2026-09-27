@@ -1,0 +1,1 @@
+{"id":"INV-STATE-001","name":"Stable explainer state","category":"state","description":"Repeated explanation calls must not mutate semantic state in a way that changes documented outputs or breaks additivity/shape contracts.","applies_to":["TreeExplainer","Explainer"],"evidence":["issue-4495"],"oracle":"repeat_call_equivalence","validation":["dynamic","differential"]}

@@ -1,0 +1,1 @@
+{"id":"SHAP-10","name":"Resource amplification / exhaustion","evidence":["historical large-model behavior"],"primary_components":["TreeExplainer","plots","maskers"],"validation":["resource-budget","stress"]}

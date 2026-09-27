@@ -1,0 +1,1 @@
+{"id":"SHAP-03","name":"Shape/interaction inconsistency","evidence":["issue-4495","issue-4869"],"primary_components":["TreeExplainer","Explanation"],"validation":["shape-oracle","dynamic"]}

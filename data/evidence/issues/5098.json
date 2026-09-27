@@ -1,0 +1,1 @@
+{"id":"issue-5098","title":"TreeExplainer ignores model_output when model is already a TreeEnsemble","url":"https://github.com/shap/shap/issues/5098","supports":["SHAP-02","INV-OUT-001"],"status":"open","observation":"pre-built TreeEnsemble can retain a different model_output state from the TreeExplainer request"}

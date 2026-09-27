@@ -1,0 +1,23 @@
+{
+  "expected_behavior": "Supported behavior should satisfy the documented SHAP contract.",
+  "fix": "",
+  "fixed_version": "",
+  "id": "SHAP-EVID-4869",
+  "observation": "issue identifies missing multiclass interaction, multioutput interaction and binary predict_proba additivity tests",
+  "observed_behavior": "Historical SHAP issue evidence relevant to the mapped invariant.",
+  "provenance": "primary",
+  "regression_test": "",
+  "reported_version": "",
+  "reproduction": "",
+  "source_date": "",
+  "status": "open",
+  "supports": [
+    "SHAP-01",
+    "SHAP-03",
+    "INV-ATTR-001",
+    "INV-SHAPE-001"
+  ],
+  "title": "Expand TreeExplainer test matrix",
+  "type": "issue",
+  "url": "https://github.com/shap/shap/issues/4869"
+}

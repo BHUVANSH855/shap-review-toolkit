@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from shap_review.types import FindingStatus
+
+
+@dataclass(frozen=True)
+class PromotionPolicy:
+    require_dynamic_for_reproduced: bool = True
+    require_independent_for_evidence_valid: bool = True
+    require_runtime_or_differential_for_confirmed: bool = True
+    require_reproducer_for_reported: bool = True
+    require_inconclusive_block: bool = True
+
+    def validate(
+        self, current: FindingStatus, target: FindingStatus, chain=None, reproducer=None
+    ) -> None:
+        from .lifecycle import transition
+
+        transition(current, target)
+        verdict = chain.verdict() if chain is not None else "UNVALIDATED"
+        if self.require_inconclusive_block and target in {
+            FindingStatus.CONFIRMED,
+            FindingStatus.REPORTED,
+        }:
+            if chain is None or any(
+                getattr(i, "passed", None) is None for i in chain.items
+            ):
+                raise ValueError("promotion blocked by inconclusive evidence")
+        if target == FindingStatus.REPRODUCED and self.require_dynamic_for_reproduced:
+            if chain is None or not any(
+                i.passed is True and i.kind.value in {"dynamic", "reproduction"}
+                for i in chain.independent_items()
+            ):
+                raise ValueError(
+                    "REPRODUCED requires positive independent dynamic/reproduction evidence"
+                )
+        if (
+            target == FindingStatus.EVIDENCE_VALID
+            and self.require_independent_for_evidence_valid
+        ):
+            if chain is None or chain.independent_kinds() < 2:
+                raise ValueError(
+                    "EVIDENCE_VALID requires at least two independent evidence kinds"
+                )
+        if (
+            target == FindingStatus.CONFIRMED
+            and self.require_runtime_or_differential_for_confirmed
+        ):
+            if chain is None or not any(
+                i.passed is True
+                and i.kind.value in {"dynamic", "differential", "reproduction"}
+                or (i.kind.value == "sanitizer" and i.details.get("finding") is True)
+                for i in chain.independent_items()
+            ):
+                raise ValueError(
+                    "CONFIRMED requires positive runtime/differential/reproduction/sanitizer evidence"
+                )
+        if (
+            target == FindingStatus.REPORTED
+            and self.require_reproducer_for_reported
+            and not reproducer
+        ):
+            raise ValueError("REPORTED requires a maintainer-usable reproducer")

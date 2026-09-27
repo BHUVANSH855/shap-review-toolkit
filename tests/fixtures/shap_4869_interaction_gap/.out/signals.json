@@ -1,0 +1,17 @@
+[
+  {
+    "analyzer": "python-contract"
+  },
+  {
+    "analyzer": "shap-semantic"
+  },
+  {
+    "analyzer": "native-boundary"
+  },
+  {
+    "analyzer": "nanobind"
+  },
+  {
+    "analyzer": "cuda"
+  }
+]

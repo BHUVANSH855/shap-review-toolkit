@@ -1,0 +1,1 @@
+{"id":"SHAP-04","name":"Model/explainer dispatch mismatch","evidence":["issue-4942"],"primary_components":["Explainer","AdditiveExplainer"],"validation":["dispatch-matrix"]}
