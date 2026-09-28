@@ -3,6 +3,7 @@ import pytest
 pytest.importorskip("shap")
 pytest.importorskip("sklearn")
 pytest.importorskip("pandas")
+
 from shap_review.fuzzing.harnesses.treeexplainer import run_case
 from shap_review.fuzzing.oracles.tree import evaluate_execution
 
@@ -19,7 +20,9 @@ def test_real_treeexplainer_execution():
         "model_output": "raw",
         "seed": 7,
     }
+
     result = run_case(case)
+
     assert result["executed"] is True
     assert result.get("failed") is not True
     assert evaluate_execution(result)["valid"] is True
@@ -37,6 +40,8 @@ def test_real_classifier_treeexplainer_execution():
         "model_output": "probability",
         "seed": 9,
     }
+
     result = run_case(case)
+
     assert result["executed"] is True
     assert result.get("failed") is not True

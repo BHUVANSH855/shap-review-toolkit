@@ -3,8 +3,14 @@
     "bug_class": "SHAP-01",
     "candidate_id": "SHAP-CAND-SHAP-01-model.py-5",
     "classification": "novel_candidate",
-    "confidence": "low",
+    "confidence": "medium",
     "evidence": [
+      {
+        "kind": "source",
+        "note": "IR call-site or flow detected at model.py:5",
+        "source": "SHAP semantic IR",
+        "strength": 2
+      },
       {
         "kind": "issue",
         "note": "Missing multiclass/multioutput/additivity coverage",
@@ -13,13 +19,13 @@
       }
     ],
     "evidence_chain": {
-      "evidence_strength_score": 0.0,
+      "evidence_strength_score": 0.7,
       "independence_policy": "Pairwise independence is graph-derived; execution, fixture/input lineage, revision/environment, ancestry and transformations are considered.",
-      "independent_evidence_kinds": 0,
+      "independent_evidence_kinds": 2,
       "items": [
         {
-          "claim": "Missing multiclass/multioutput/additivity coverage",
-          "confidence": 0.4,
+          "claim": "IR call-site or flow detected at model.py:5",
+          "confidence": 0.2,
           "derived_from": [],
           "details": {},
           "environment_fingerprint": null,
@@ -27,11 +33,33 @@
           "execution_id": null,
           "fixture_id": null,
           "independence_scope": "graph-derived-pairwise",
-          "independent": false,
+          "independent": true,
           "input_fingerprint": null,
-          "intrinsically_valid": false,
+          "intrinsically_valid": true,
+          "kind": "static",
+          "origin": "source",
+          "parent_evidence_ids": [],
+          "passed": true,
+          "producer": null,
+          "repository_revision": null,
+          "source": "SHAP semantic IR",
+          "transformation": null
+        },
+        {
+          "claim": "Missing multiclass/multioutput/additivity coverage",
+          "confidence": 0.4,
+          "derived_from": [],
+          "details": {},
+          "environment_fingerprint": null,
+          "evidence_id": "e2",
+          "execution_id": null,
+          "fixture_id": null,
+          "independence_scope": "graph-derived-pairwise",
+          "independent": true,
+          "input_fingerprint": null,
+          "intrinsically_valid": true,
           "kind": "historical",
-          "origin": "derived",
+          "origin": "external",
           "parent_evidence_ids": [],
           "passed": true,
           "producer": null,
@@ -40,9 +68,9 @@
           "transformation": null
         }
       ],
-      "score": 0.0,
+      "score": 0.7,
       "score_semantics": "Heuristic evidence-strength score for prioritization, not probability.",
-      "verdict": "UNVALIDATED"
+      "verdict": "HISTORICALLY_CORRELATED"
     },
     "file": "model.py",
     "invariant": "INV-ATTR-001",
@@ -59,8 +87,14 @@
     "bug_class": "SHAP-02",
     "candidate_id": "SHAP-CAND-SHAP-02-model.py-5",
     "classification": "novel_candidate",
-    "confidence": "low",
+    "confidence": "medium",
     "evidence": [
+      {
+        "kind": "source",
+        "note": "IR call-site or flow detected at model.py:5",
+        "source": "SHAP semantic IR",
+        "strength": 2
+      },
       {
         "kind": "issue",
         "note": "TreeExplainer ignores model_output when model is already a TreeEnsemble",
@@ -69,13 +103,13 @@
       }
     ],
     "evidence_chain": {
-      "evidence_strength_score": 0.0,
+      "evidence_strength_score": 0.7,
       "independence_policy": "Pairwise independence is graph-derived; execution, fixture/input lineage, revision/environment, ancestry and transformations are considered.",
-      "independent_evidence_kinds": 0,
+      "independent_evidence_kinds": 2,
       "items": [
         {
-          "claim": "TreeExplainer ignores model_output when model is already a TreeEnsemble",
-          "confidence": 0.4,
+          "claim": "IR call-site or flow detected at model.py:5",
+          "confidence": 0.2,
           "derived_from": [],
           "details": {},
           "environment_fingerprint": null,
@@ -83,11 +117,33 @@
           "execution_id": null,
           "fixture_id": null,
           "independence_scope": "graph-derived-pairwise",
-          "independent": false,
+          "independent": true,
           "input_fingerprint": null,
-          "intrinsically_valid": false,
+          "intrinsically_valid": true,
+          "kind": "static",
+          "origin": "source",
+          "parent_evidence_ids": [],
+          "passed": true,
+          "producer": null,
+          "repository_revision": null,
+          "source": "SHAP semantic IR",
+          "transformation": null
+        },
+        {
+          "claim": "TreeExplainer ignores model_output when model is already a TreeEnsemble",
+          "confidence": 0.4,
+          "derived_from": [],
+          "details": {},
+          "environment_fingerprint": null,
+          "evidence_id": "e2",
+          "execution_id": null,
+          "fixture_id": null,
+          "independence_scope": "graph-derived-pairwise",
+          "independent": true,
+          "input_fingerprint": null,
+          "intrinsically_valid": true,
           "kind": "historical",
-          "origin": "derived",
+          "origin": "external",
           "parent_evidence_ids": [],
           "passed": true,
           "producer": null,
@@ -96,9 +152,9 @@
           "transformation": null
         }
       ],
-      "score": 0.0,
+      "score": 0.7,
       "score_semantics": "Heuristic evidence-strength score for prioritization, not probability.",
-      "verdict": "UNVALIDATED"
+      "verdict": "HISTORICALLY_CORRELATED"
     },
     "file": "model.py",
     "invariant": "INV-OUT-001",
