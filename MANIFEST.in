@@ -1,5 +1,4 @@
 include README.md
-include CHANGELOG.md
 include LICENSE
 recursive-include data *.json
 recursive-include shap_review/resources *.json
