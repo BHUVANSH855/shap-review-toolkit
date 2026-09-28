@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shap-review-toolkit"
-version = "0.30.0"
+version = "0.0.0.dev0"
 description = "Evidence-driven semantic review toolkit for SHAP"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,16 @@ dependencies = []
 [project.optional-dependencies]
 analysis = ["tree-sitter>=0.22", "tree-sitter-python>=0.23"]
 test = ["pytest>=8"]
-integration = ["numpy>=1.24", "pandas>=2.0", "scipy>=1.10", "scikit-learn>=1.3", "shap>=0.45", "xgboost>=2.0", "lightgbm>=4.0", "catboost>=1.2"]
+integration = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "shap>=0.45",
+    "xgboost>=2.0",
+    "lightgbm>=4.0",
+    "catboost>=1.2",
+]
 
 [project.scripts]
 shap-review = "shap_review.cli:main"

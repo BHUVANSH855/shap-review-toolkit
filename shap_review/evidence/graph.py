@@ -45,7 +45,7 @@ class EvidenceGraph:
         self,
         item: EvidenceItem,
         *,
-        producer: str = "unknown",
+        producer: str | None = None,
         execution_id: str | None = None,
         repository_revision: str | None = None,
         environment: dict[str, Any] | None = None,
@@ -53,22 +53,42 @@ class EvidenceGraph:
         fixture_id: str | None = None,
         input_fingerprint: str | None = None,
     ) -> EvidenceNode:
+        """Add an EvidenceItem while preserving its canonical provenance."""
         evidence_id = item.evidence_id or f"{item.kind.value}:{len(self.nodes) + 1}"
+
         node = EvidenceNode(
             evidence_id=evidence_id,
             kind=item.kind.value,
             source=item.source,
-            producer=producer,
+            producer=producer if producer is not None else (item.producer or "unknown"),
             claim=item.claim,
             passed=item.passed,
             confidence=item.confidence,
             parent_ids=tuple(item.derived_from),
-            execution_id=execution_id,
-            repository_revision=repository_revision,
+            execution_id=(
+                execution_id
+                if execution_id is not None
+                else item.execution_id
+            ),
+            repository_revision=(
+                repository_revision
+                if repository_revision is not None
+                else item.repository_revision
+            ),
             environment=dict(environment or {}),
-            transformation=transformation,
-            fixture_id=fixture_id or item.fixture_id,
-            input_fingerprint=input_fingerprint or item.input_fingerprint,
+            transformation=(
+                transformation
+                if transformation is not None
+                else item.transformation
+            ),
+            fixture_id=(
+                fixture_id if fixture_id is not None else item.fixture_id
+            ),
+            input_fingerprint=(
+                input_fingerprint
+                if input_fingerprint is not None
+                else item.input_fingerprint
+            ),
         )
         self.add(node)
         return node
@@ -114,15 +134,13 @@ class EvidenceGraph:
             left.repository_revision
             and right.repository_revision
             and left.repository_revision == right.repository_revision
+            and left.environment
+            and right.environment
+            and left.environment == right.environment
         ):
-            # Same revision alone does not imply correlation, but when the environment
-            # fingerprint also matches we conservatively treat the pair as correlated.
-            if (
-                left.environment
-                and right.environment
-                and left.environment == right.environment
-            ):
-                return False
+            # Same revision alone does not imply correlation, but matching
+            # revision and environment are treated as correlated.
+            return False
         if (
             left.transformation
             and right.transformation
@@ -131,9 +149,14 @@ class EvidenceGraph:
             return False
         # Producer identity alone does not prove correlation. The same validator
         # may produce independent observations in separate executions.
-        a = self.ancestors(evidence_id) | {evidence_id}
-        b = self.ancestors(other_id) | {other_id}
-        return a.isdisjoint(b)
+        left_ancestry = self.ancestors(evidence_id)
+        right_ancestry = self.ancestors(other_id)
+
+        return not (
+            evidence_id in right_ancestry
+            or other_id in left_ancestry
+            or left_ancestry.intersection(right_ancestry)
+        )
 
     def independence_reason(self, evidence_id: str, other_id: str) -> str:
         if evidence_id not in self.nodes or other_id not in self.nodes:
@@ -164,10 +187,17 @@ class EvidenceGraph:
             and a.transformation == b.transformation
         ):
             return "shared-transformation"
-        # Same producer is not sufficient to establish correlation when execution
-        # and fixture provenance are distinct.
-        if not self.is_independent(evidence_id, other_id):
+        left_ancestors = self.ancestors(evidence_id)
+        right_ancestors = self.ancestors(other_id)
+
+        if (
+            evidence_id in right_ancestors
+            or other_id in left_ancestors
+            or left_ancestors.intersection(right_ancestors)
+        ):
             return "shared-ancestry"
+
+        # Producer identity alone is not sufficient to establish correlation.
         return "independent"
 
     def independent_pairs(self) -> list[tuple[str, str]]:

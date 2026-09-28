@@ -1,7 +1,7 @@
 {
   "name": "shap_review",
-  "version": "0.30.0",
-  "schema_version": "2.10",
+  "version": "0.0.0.dev0",
+  "schema_version": "2",
   "description": "Evidence-driven SHAP repository review engine",
   "commands": [
     "map",

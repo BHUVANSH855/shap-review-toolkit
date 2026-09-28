@@ -25,10 +25,16 @@ _FUNC = re.compile(
     r"(?:static\s+)?(?:inline\s+)?[\w:<>~*&\s]+\s+([A-Za-z_]\w*)\s*\([^;{}]*\)\s*\{"
 )
 _BOUNDARY = re.compile(
-    r"\b(PyArray_DATA|PyArray_GETPTR\w*|PyObject_Call\w*|PyObject_GetAttr\w*|PyList_GET_ITEM|nb::ndarray|nb::object|cudaMemcpy\w*|cudaMalloc\w*)\b"
+    r"\b("
+    r"PyArray_DATA|PyArray_GETPTR\w*|PyObject_Call\w*|"
+    r"PyObject_GetAttr\w*|PyList_GET_ITEM|nb::ndarray|nb::object|"
+    r"cudaMemcpy\w*|cudaMalloc\w*"
+    r")\b"
 )
 _FREE = re.compile(
-    r"\b(free|delete|PyMem_Free|Py_DECREF|Py_XDECREF|release|cudaFree)\s*\(?\s*([A-Za-z_]\w*)?"
+    r"\b("
+    r"free|delete|PyMem_Free|Py_DECREF|Py_XDECREF|release|cudaFree"
+    r")\s*\(?\s*([A-Za-z_]\w*)?"
 )
 _ERROR = re.compile(r"\b(return\s+NULL|return\s+-1|PyErr_|throw)\b")
 _VALIDATION = re.compile(r"\b(if|assert|PyArg_|PyErr_Set)\b")
@@ -39,59 +45,76 @@ def function_ranges(lines):
     current = None
     start = None
     depth = 0
+
     for i, line in enumerate(lines, 1):
-        m = _FUNC.search(line)
-        if m and current is None:
-            current, start, depth = m.group(1), i, line.count("{") - line.count("}")
+        match = _FUNC.search(line)
+
+        if match and current is None:
+            current = match.group(1)
+            start = i
+            depth = line.count("{") - line.count("}")
             continue
+
         if current is not None:
             depth += line.count("{") - line.count("}")
+
             if depth <= 0:
                 out.append((start, i, current))
                 current = None
                 start = None
+
     if current is not None:
         out.append((start, len(lines), current))
+
     return out
 
 
 def function_for(ranges, line):
-    for a, b, n in ranges:
-        if a <= line <= b:
-            return n
+    for start, end, name in ranges:
+        if start <= line <= end:
+            return name
     return None
 
 
 def _boundary_symbol(line):
-    m = re.search(
-        r"\b([A-Za-z_]\w*)\s*=\s*(?:[^;]*?)\b(?:PyArray_DATA|PyArray_GETPTR\w*)\s*\(",
+    match = re.search(
+        r"\b([A-Za-z_]\w*)\s*=\s*(?:[^;]*?)\b"
+        r"(?:PyArray_DATA|PyArray_GETPTR\w*)\s*\(",
         line,
     )
-    return m.group(1) if m else None
+    return match.group(1) if match else None
 
 
 def analyze_flow(path):
     p = Path(path)
-    lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    lines = p.read_text(
+        encoding="utf-8",
+        errors="replace",
+    ).splitlines()
+
     ranges = function_ranges(lines)
     facts = []
     order = 0
     depth = 0
+
     for i, line in enumerate(lines, 1):
-        st = line.strip()
-        depth = max(0, depth - st.count("}"))
+        stripped = line.strip()
+        depth = max(0, depth - stripped.count("}"))
+
         kind = None
         symbol = None
-        if _BOUNDARY.search(st):
+
+        if _BOUNDARY.search(stripped):
             kind = "native-boundary"
-            symbol = _boundary_symbol(st)
-        elif _FREE.search(st):
+            symbol = _boundary_symbol(stripped)
+        elif _FREE.search(stripped):
             kind = "lifetime-end"
-            symbol = _FREE.search(st).group(2)
-        elif _ERROR.search(st):
+            symbol = _FREE.search(stripped).group(2)
+        elif _ERROR.search(stripped):
             kind = "error-path"
-        elif _VALIDATION.search(st):
+        elif _VALIDATION.search(stripped):
             kind = "validation"
+
         if kind:
             order += 1
             facts.append(
@@ -100,49 +123,110 @@ def analyze_flow(path):
                     i,
                     function_for(ranges, i),
                     kind,
-                    st[:300],
+                    stripped[:300],
                     order,
                     depth,
                     symbol,
                 )
             )
-        depth += st.count("{")
+
+        depth += stripped.count("{")
+
     return facts
 
 
 def correlate_boundary(path, boundary_line, radius=80):
+    """Correlate nearby native-flow facts without claiming proof.
+
+    This analysis is intentionally heuristic. It uses textual boundary
+    detection, approximate function ranges, source ordering, and nearby
+    lifetime/error markers. A returned correlation is therefore a triage
+    signal, not a confirmed ownership, lifetime, control-flow, or
+    memory-safety finding.
+    """
     facts = analyze_flow(path)
-    boundary = next((f for f in facts if f.line == boundary_line), None)
-    relevant = [f for f in facts if abs(f.line - boundary_line) <= radius]
+    boundary = next(
+        (fact for fact in facts if fact.line == boundary_line),
+        None,
+    )
+
+    relevant = [
+        fact
+        for fact in facts
+        if abs(fact.line - boundary_line) <= radius
+    ]
+
     function = (
         boundary.function
         if boundary
-        else next((f.function for f in relevant if f.function), None)
+        else next(
+            (fact.function for fact in relevant if fact.function),
+            None,
+        )
     )
-    same = [f for f in relevant if f.function == function]
-    symbol = boundary.symbol if boundary else None
-    lifetime = [
-        f
-        for f in same
-        if f.kind == "lifetime-end"
-        and f.line > boundary_line
-        and (symbol is None or f.symbol in (None, symbol))
+
+    same = [
+        fact
+        for fact in relevant
+        if fact.function == function
     ]
-    errors = [f for f in same if f.kind == "error-path" and f.line > boundary_line]
+
+    symbol = boundary.symbol if boundary else None
+
+    lifetime = [
+        fact
+        for fact in same
+        if (
+            fact.kind == "lifetime-end"
+            and fact.line > boundary_line
+            and (symbol is None or fact.symbol in (None, symbol))
+        )
+    ]
+
+    errors = [
+        fact
+        for fact in same
+        if fact.kind == "error-path" and fact.line > boundary_line
+    ]
+
     return {
         "boundary_line": boundary_line,
         "function": function,
         "symbol": symbol,
-        "before": [f.to_dict() for f in same if f.line < boundary_line],
-        "after": [f.to_dict() for f in same if f.line >= boundary_line],
+        "before": [
+            fact.to_dict()
+            for fact in same
+            if fact.line < boundary_line
+        ],
+        "after": [
+            fact.to_dict()
+            for fact in same
+            if fact.line >= boundary_line
+        ],
         "lifetime_after_boundary": bool(lifetime),
         "error_after_boundary": bool(errors),
         "validation_before_boundary": any(
-            f.kind == "validation" and f.line < boundary_line for f in same
+            fact.kind == "validation"
+            and fact.line < boundary_line
+            for fact in same
         ),
-        "same_function": True if boundary else False,
+        "same_function": boundary is not None,
         "analysis_mode": "triage",
-        "component_hints": ["cutils", "cext", "cext-gpu"]
-        if any(x in str(path) for x in ("shap/cutils", "shap/cext"))
-        else [],
+        "analysis_basis": [
+            "textual-boundary-matching",
+            "approximate-function-range",
+            "source-order-correlation",
+            "nearby-lifetime-marker",
+            "nearby-error-marker",
+        ],
+        "proof_status": "NOT_PROVEN",
+        "requires_runtime_or_control_flow_validation": True,
+        "component_hints": (
+            ["cutils", "cext", "cext-gpu"]
+            if any(
+                component in str(path)
+                for component in ("shap/cutils", "shap/cext")
+            )
+            else []
+        ),
     }

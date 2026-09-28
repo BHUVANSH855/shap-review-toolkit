@@ -304,3 +304,22 @@ def test_input_mutation_oracle_is_registered():
     from shap_review.contracts.oracles import ORACLE_REGISTRY
 
     assert "InputMutationOracle" in ORACLE_REGISTRY
+
+def test_native_flow_detects_lifetime_after_boundary(tmp_path: Path):
+    from shap_review.semantic.native_flow import correlate_boundary
+
+    path = tmp_path / "x.cpp"
+    path.write_text(
+        """
+void f(PyObject* x) {
+    auto p = PyArray_DATA(x);
+    if (!p) { return; }
+    Py_DECREF(x);
+    free(p);
+}
+"""
+    )
+
+    result = correlate_boundary(path, 3)
+
+    assert result["lifetime_after_boundary"] is True

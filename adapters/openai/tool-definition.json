@@ -18,13 +18,21 @@
             "investigate",
             "reproduce",
             "fuzz",
+            "fuzz-treeexplainer",
+            "fuzz-protocol",
+            "fuzz-backends",
+            "differential",
+            "cpu-gpu-differential",
             "regressions",
             "history",
-            "differential",
             "sanitizer",
+            "differential-versions",
+            "evidence",
+            "semantic-oracle",
+            "native-map",
+            "api-era",
             "capabilities",
-            "version",
-            "evidence"
+            "version"
           ]
         },
         "arguments": {
@@ -37,8 +45,8 @@
       ]
     }
   },
-  "version": "0.30.0",
-  "schema_version": "2.10",
+  "version": "0.0.0.dev0",
+  "schema_version": "2",
   "commands": [
     "map",
     "health",

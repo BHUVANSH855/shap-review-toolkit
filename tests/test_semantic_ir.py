@@ -2,7 +2,6 @@ from pathlib import Path
 
 from shap_review.semantic_ir import SemanticIRBuilder
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 

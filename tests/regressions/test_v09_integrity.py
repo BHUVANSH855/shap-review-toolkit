@@ -75,8 +75,67 @@ def test_shap_contract():
     assert r["values_shape_match"]
 
 
+def _declared_command_enum(manifest: dict) -> list[str] | None:
+    """Return a nested command enum when the manifest exposes one."""
+    if manifest.get("type") == "function":
+        function = manifest["function"]
+        parameters = function["parameters"]
+        properties = parameters["properties"]
+        command = properties["command"]
+        return command["enum"]
+
+    if "parameters" in manifest:
+        properties = manifest["parameters"]["properties"]
+        command = properties["command"]
+        return command["enum"]
+
+    if "inputSchema" in manifest:
+        properties = manifest["inputSchema"]["properties"]
+        command = properties["command"]
+        return command["enum"]
+
+    function = manifest.get("function", {})
+    if "parameters" in function:
+        properties = function["parameters"]["properties"]
+        command = properties["command"]
+        return command["enum"]
+
+    return None
+
+
+def _assert_provider_manifest_contract(
+    provider: str,
+    name: str,
+    manifest: dict,
+    capabilities: list[str],
+    schema_version: str,
+    version: str,
+) -> None:
+    """Validate common metadata and any provider-specific command declaration."""
+    assert manifest["version"] == version, (
+        f"{provider}/{name} has stale version metadata"
+    )
+    assert manifest["schema_version"] == schema_version, (
+        f"{provider}/{name} has stale schema metadata"
+    )
+    assert manifest["commands"] == capabilities, (
+        f"{provider}/{name} top-level command list drifted"
+    )
+
+    declared = _declared_command_enum(manifest)
+
+    if declared is not None:
+        assert declared == capabilities, (
+            f"{provider}/{name} declared command enum drifted"
+        )
+
+
 def test_provider_manifests_match_canonical():
     from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
+
+    capabilities = list(CAPABILITIES)
+
+    checked = 0
 
     for provider in ("claude", "openai", "gemini"):
         for name in (
@@ -87,10 +146,62 @@ def test_provider_manifests_match_canonical():
             p = Path("adapters") / provider / name
             if not p.exists():
                 continue
-            d = json.loads(p.read_text())
-            assert d["version"] == VERSION
-            assert d["schema_version"] == SCHEMA_VERSION
-            assert d["commands"] == list(CAPABILITIES)
+
+            checked += 1
+            manifest = json.loads(p.read_text(encoding="utf-8"))
+
+            _assert_provider_manifest_contract(
+                provider,
+                name,
+                manifest,
+                capabilities,
+                SCHEMA_VERSION,
+                VERSION,
+            )
+
+    assert checked > 0, "no provider manifests were discovered"
+
+
+def test_openai_nested_command_enum_matches_capabilities():
+    from shap_review.version import CAPABILITIES
+
+    path = Path("adapters/openai/tool-definition.json")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+
+    declared = (
+        manifest["function"]
+        ["parameters"]
+        ["properties"]
+        ["command"]
+        ["enum"]
+    )
+
+    assert declared == list(CAPABILITIES)
+
+
+def test_provider_manifest_missing_top_level_commands_fails():
+    from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
+
+    broken = {
+        "version": VERSION,
+        "schema_version": SCHEMA_VERSION,
+    }
+
+    try:
+        _assert_provider_manifest_contract(
+            "broken",
+            "tool-schema.json",
+            broken,
+            list(CAPABILITIES),
+            SCHEMA_VERSION,
+            VERSION,
+        )
+    except KeyError:
+        return
+
+    raise AssertionError(
+        "provider manifests must fail when the canonical command list is missing"
+    )
 
 
 def test_protocol_campaign_records_real_events():
@@ -123,3 +234,23 @@ def test_native_flow_associates_symbol(tmp_path):
     assert r["same_function"]
     assert r["symbol"] == "data"
     assert r["lifetime_after_boundary"]
+
+def test_native_flow_marks_heuristic_results_as_not_proven(tmp_path):
+    from shap_review.semantic.native_flow import correlate_boundary
+
+    source = """void f(PyObject* x) {
+    auto data = PyArray_DATA(x);
+    if (!data) { return; }
+    Py_DECREF(data);
+}
+"""
+
+    path = tmp_path / "native.cpp"
+    path.write_text(source, encoding="utf-8")
+
+    result = correlate_boundary(path, boundary_line=2)
+
+    assert result["analysis_mode"] == "triage"
+    assert result["proof_status"] == "NOT_PROVEN"
+    assert result["requires_runtime_or_control_flow_validation"] is True
+    assert result["lifetime_after_boundary"] is True

@@ -1,6 +1,6 @@
 {
   "name": "shap-review-toolkit",
-  "version": "0.30.0",
+  "version": "0.0.0.dev0",
   "description": "Evidence-driven semantic review toolkit for SHAP",
   "commands": [
     "map",

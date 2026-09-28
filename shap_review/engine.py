@@ -93,17 +93,25 @@ class ReviewEngine:
             raw.extend(analyzer.analyze(root))
         candidates = CandidateAggregator().merge(raw)
 
-        # Runtime oracle bridge: run a small deterministic fuzzing campaign and
-        # attach dynamic evidence to matching candidates. No-ops when SHAP is
-        # not installed. Results are stored alongside other artifacts.
         bridge = run_bridge()
+
+        # The bridge currently executes against the installed SHAP runtime,
+        # not the repository represented by ``root``. Only explicitly
+        # correlated runtime observations may be attached to static candidates.
         candidates = attach_dynamic_evidence(candidates, bridge)
+
         write_json(
             artifact / "runtime-bridge.json",
             {
                 "available": bridge.get("available", False),
+                "campaign_scope": "installed-runtime",
+                "evidence_scope": "runtime-campaign",
+                "repository_root": str(root),
+                "repository_runtime_match": False,
+                "attach_policy": "explicit-candidate-correlation-only",
                 "anomalies": len(bridge.get("anomalies", [])),
                 "campaign_summary": bridge.get("campaign_summary", {}),
+                "provenance": bridge.get("provenance", {}),
             },
         )
 

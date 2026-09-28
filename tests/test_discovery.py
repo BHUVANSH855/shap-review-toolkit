@@ -26,3 +26,71 @@ def test_build_scanner(tmp_path: Path):
 
     assert "_cutils" in discovery["targets"]
     assert "_cext" in discovery["targets"]
+
+def test_history_reports_changed_symbols(tmp_path: Path):
+    import subprocess
+
+    from shap_review.discovery.history import HistoryScanner
+
+    subprocess.run(
+        ["git", "init", str(tmp_path)],
+        check=True,
+        capture_output=True,
+    )
+
+    (tmp_path / "x.py").write_text(
+        "def old_name():\n    return 1\n"
+    )
+
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "."],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=T",
+            "-c",
+            "user.email=t@e",
+            "commit",
+            "-m",
+            "initial",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    (tmp_path / "x.py").write_text(
+        "def new_name():\n    return 2\n"
+    )
+
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "."],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=T",
+            "-c",
+            "user.email=t@e",
+            "commit",
+            "-m",
+            "fix #4911",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    result = HistoryScanner().analyze_issue(tmp_path, 4911)
+
+    assert "new_name" in result["semantic_summary"]["symbols_changed"]
+    assert "old_name" in result["semantic_summary"]["symbols_changed"]

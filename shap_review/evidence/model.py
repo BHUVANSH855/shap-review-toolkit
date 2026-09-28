@@ -61,18 +61,32 @@ class EvidenceItem:
             or self.origin == EvidenceOrigin.DERIVED
         ):
             return False
+
         if self.kind in {
             EvidenceKind.DYNAMIC,
             EvidenceKind.REPRODUCTION,
             EvidenceKind.DIFFERENTIAL,
             EvidenceKind.SANITIZER,
         }:
-            return bool(self.execution_id)
+            return bool(
+                self.execution_id
+                and (
+                    self.fixture_id
+                    or self.input_fingerprint
+                    or self.repository_revision
+                    or self.environment_fingerprint
+                )
+            )
+
         return True
 
     @property
     def independent(self) -> bool:
-        """Deprecated compatibility field; True means only intrinsically valid, not pairwise independent."""
+        """Compatibility field; true only when the item is intrinsically valid.
+
+        Pairwise independence is determined by ``EvidenceGraph`` and is not
+        represented by this item-level property.
+        """
         return self.intrinsically_valid
 
     def to_dict(self):
@@ -82,6 +96,10 @@ class EvidenceItem:
         d["intrinsically_valid"] = self.intrinsically_valid
         d["independence_scope"] = "graph-derived-pairwise"
         d["independent"] = self.independent
+        validation = validate_evidence_item(self)
+        d["validation_status"] = validation.status
+        d["provenance_valid"] = validation.provenance_valid
+        d["scoring_eligible"] = validation.scoring_eligible
         return d
 
 
@@ -94,25 +112,44 @@ class EvidenceChain:
         validation = validate_evidence_item(item)
         if not validation.valid:
             raise ValueError(
-                f"invalid evidence {getattr(item, 'evidence_id', '<unknown>')}: {validation.reason}; missing={validation.missing}"
+                f"invalid evidence {getattr(item, 'evidence_id', '<unknown>')}: "
+                f"{validation.reason}; missing={validation.missing}"
             )
         self.items.append(item)
 
     def kinds(self):
         return {i.kind for i in self.items}
 
+    @staticmethod
+    def _scoring_eligible(item: EvidenceItem) -> bool:
+        """Return whether an item is eligible to participate in scoring."""
+        validation = validate_evidence_item(item)
+        return bool(
+            validation.scoring_eligible
+            and item.intrinsically_valid
+        )
+
     def independent_items(self):
+        eligible = [
+            item
+            for item in self.items
+            if self._scoring_eligible(item)
+        ]
+
         if self.graph is None:
-            return [i for i in self.items if i.independent]
+            return eligible
+
         selected = []
-        for item in self.items:
-            if not item.intrinsically_valid or item.evidence_id not in self.graph.nodes:
+        for item in eligible:
+            if item.evidence_id not in self.graph.nodes:
                 continue
+
             if all(
                 self.graph.is_independent(item.evidence_id, other.evidence_id)
                 for other in selected
             ):
                 selected.append(item)
+
         return selected
 
     def independent_kinds(self):
@@ -190,6 +227,13 @@ class EvidenceChain:
             "score": round(self.evidence_strength_score(), 3),
             "independent_evidence_kinds": self.independent_kinds(),
             "items": [i.to_dict() for i in self.items],
-            "independence_policy": "Pairwise independence is graph-derived; execution, fixture/input lineage, revision/environment, ancestry and transformations are considered.",
-            "score_semantics": "Heuristic evidence-strength score for prioritization, not probability.",
+            "independence_policy": (
+                "Pairwise independence is graph-derived; execution, "
+                "fixture/input lineage, revision/environment, ancestry and "
+                "transformations are considered."
+            ),
+            "score_semantics": (
+                "Heuristic evidence-strength score for prioritization, "
+                "not probability."
+            ),
         }

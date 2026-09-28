@@ -1,5 +1,7 @@
-VERSION = "0.30.0"
-SCHEMA_VERSION = "2.10"
+from __future__ import annotations
+
+VERSION = "0.0.0.dev0"
+SCHEMA_VERSION = "2"
 
 # Command order must match the adapter JSON manifests exactly.
 CAPABILITIES: tuple[str, ...] = (
@@ -31,7 +33,7 @@ CAPABILITIES: tuple[str, ...] = (
 
 
 def release_metadata(provider: str = "generic") -> dict:
-    """Return structured release metadata for the capabilities command."""
+    """Return structured development metadata for the capabilities command."""
     return {
         "version": VERSION,
         "toolkit_version": VERSION,

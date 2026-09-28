@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from shap_review.engine import ReviewEngine
-
+from shap_review.runtime_bridge import (
+    _candidate_fingerprint,
+    attach_dynamic_evidence,
+)
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -117,6 +120,7 @@ def test_same_producer_can_be_independent_across_runs():
         evidence_id="a",
         execution_id="run-a",
         producer="oracle",
+        input_fingerprint="input-a",
     )
 
     second = EvidenceItem(
@@ -127,6 +131,7 @@ def test_same_producer_can_be_independent_across_runs():
         evidence_id="b",
         execution_id="run-b",
         producer="oracle",
+        input_fingerprint="input-b",
     )
 
     chain = EvidenceChain()
@@ -134,6 +139,7 @@ def test_same_producer_can_be_independent_across_runs():
     chain.add(second)
 
     assert len(chain.independent_items()) == 2
+
 
 def test_evidence_graph_detects_shared_input_fingerprint():
     from shap_review.evidence.graph import EvidenceGraph, EvidenceNode
@@ -191,3 +197,258 @@ def test_sanitizer_clean_never_confirms_memory_safety():
     chain.add(item)
 
     assert chain.verdict() == "SANITIZER_CLEAN"
+
+
+def test_runtime_anomaly_with_matching_bug_class_is_not_attached_without_correlation():
+    candidates = run(FIX / "shap_4911_nullable_dtype")
+
+    target = next(
+        candidate
+        for candidate in candidates
+        if candidate.bug_class == "SHAP-05"
+    )
+
+    original_chain_size = len(target.evidence_chain.items)
+    original_validation_required = target.validation_required
+
+    bridge_result = {
+        "available": True,
+        "anomalies": [
+            {
+                "case": {
+                    "n_features": 4,
+                    "classification": False,
+                    "model_output": "raw",
+                },
+                "execution": {
+                    "executed": True,
+                    "input_unchanged": False,
+                },
+                "classification": {
+                    "kind": "INPUT_MUTATION",
+                    "bug_class": "SHAP-05",
+                    "confidence": 0.7,
+                },
+                "provenance": {
+                    "execution_id": "unrelated-run",
+                    "input_fingerprint": "unrelated-input",
+                    "environment_fingerprint": "env-a",
+                    "producer": "runtime-bridge",
+                },
+            }
+        ],
+        "classifications": [
+            {
+                "kind": "INPUT_MUTATION",
+                "bug_class": "SHAP-05",
+                "confidence": 0.7,
+            }
+        ],
+    }
+
+    updated = attach_dynamic_evidence([target], bridge_result)
+    result = updated[0]
+
+    assert len(result.evidence_chain.items) == original_chain_size
+    assert result.validation_required == original_validation_required
+    assert "dynamic-evidence" not in result.tags
+    assert "runtime-bridge" not in result.tags
+
+
+def test_correlated_runtime_anomaly_can_attach_to_matching_candidate():
+    candidates = run(FIX / "shap_4911_nullable_dtype")
+
+    target = next(
+        candidate
+        for candidate in candidates
+        if candidate.bug_class == "SHAP-05"
+    )
+
+    candidate_fingerprint = _candidate_fingerprint(target)
+
+    bridge_result = {
+        "available": True,
+        "anomalies": [
+            {
+                "case": {
+                    "n_features": 4,
+                    "classification": False,
+                    "model_output": "raw",
+                },
+                "execution": {
+                    "executed": True,
+                    "input_unchanged": False,
+                },
+                "classification": {
+                    "kind": "INPUT_MUTATION",
+                    "bug_class": "SHAP-05",
+                    "confidence": 0.7,
+                },
+                "provenance": {
+                    "execution_id": "correlated-run",
+                    "input_fingerprint": "matching-input",
+                    "candidate_fingerprint": candidate_fingerprint,
+                    "environment_fingerprint": "env-a",
+                    "producer": "runtime-bridge",
+                    "shap_version": "test",
+                },
+            }
+        ],
+        "classifications": [
+            {
+                "kind": "INPUT_MUTATION",
+                "bug_class": "SHAP-05",
+                "confidence": 0.7,
+            }
+        ],
+    }
+
+    updated = attach_dynamic_evidence([target], bridge_result)
+    result = updated[0]
+
+    dynamic = [
+        item
+        for item in result.evidence_chain.items
+        if item.source == "runtime-bridge"
+    ]
+
+    assert len(dynamic) == 1
+    assert dynamic[0].origin.value == "execution"
+    assert dynamic[0].details["execution_id"] == "correlated-run"
+    assert dynamic[0].details["candidate_fingerprint"] == candidate_fingerprint
+    assert "dynamic-evidence" in result.tags
+    assert "runtime-bridge" in result.tags
+    assert result.validation_required == target.validation_required
+
+
+def test_runtime_bridge_preserves_environment_provenance():
+    from shap_review.runtime_bridge import run_bridge
+
+    result = run_bridge(iterations=0, seed=42)
+
+    assert "provenance" in result
+
+    provenance = result["provenance"]
+    assert "environment_fingerprint" in provenance
+    assert "python_executable" in provenance
+    assert "python_version" in provenance
+    assert "shap_version" in provenance
+    assert "shap_source_path" in provenance
+
+    if result["available"]:
+        assert provenance["producer"] == "runtime-bridge"
+        assert provenance["execution_id"]
+        assert provenance["seed"] == 42
+        assert provenance["iterations"] == 0
+
+def test_evidence_graph_preserves_item_provenance():
+    from shap_review.evidence.graph import EvidenceGraph
+    from shap_review.evidence.model import EvidenceItem, EvidenceKind, EvidenceOrigin
+
+    item = EvidenceItem(
+        EvidenceKind.DYNAMIC,
+        "runtime",
+        "claim",
+        False,
+        origin=EvidenceOrigin.EXECUTION,
+        evidence_id="runtime-1",
+        execution_id="exec-1",
+        producer="runtime-bridge",
+        fixture_id="fixture-1",
+        input_fingerprint="input-1",
+        repository_revision="revision-1",
+        environment_fingerprint="environment-1",
+        transformation="normalization",
+    )
+
+    graph = EvidenceGraph()
+    node = graph.add_item(item)
+
+    assert node.execution_id == "exec-1"
+    assert node.producer == "runtime-bridge"
+    assert node.fixture_id == "fixture-1"
+    assert node.input_fingerprint == "input-1"
+    assert node.repository_revision == "revision-1"
+    assert node.transformation == "normalization"
+    assert node.environment == {}
+
+
+def test_evidence_graph_detects_shared_ancestry():
+    from shap_review.evidence.graph import EvidenceGraph, EvidenceNode
+
+    graph = EvidenceGraph()
+
+    graph.add(
+        EvidenceNode(
+            "root",
+            "static",
+            "source",
+            "scanner",
+            "root",
+            True,
+        )
+    )
+    graph.add(
+        EvidenceNode(
+            "left",
+            "dynamic",
+            "runtime",
+            "runner-a",
+            "left",
+            True,
+            parent_ids=("root",),
+        )
+    )
+    graph.add(
+        EvidenceNode(
+            "right",
+            "dynamic",
+            "runtime",
+            "runner-b",
+            "right",
+            True,
+            parent_ids=("root",),
+        )
+    )
+
+    assert not graph.is_independent("left", "right")
+    assert graph.independence_reason("left", "right") == "shared-ancestry"
+
+def test_evidence_verdict_stays_static_when_runtime_provenance_is_ambiguous():
+    from shap_review.evidence.model import EvidenceChain, EvidenceItem, EvidenceKind
+
+    chain = EvidenceChain()
+
+    chain.add(
+        EvidenceItem(
+            EvidenceKind.STATIC,
+            "x",
+            "candidate",
+            True,
+            evidence_id="static-1",
+        )
+    )
+
+    chain.add(
+        EvidenceItem(
+            EvidenceKind.DYNAMIC,
+            "runtime",
+            "executed",
+            True,
+            evidence_id="dynamic-1",
+        )
+    )
+
+    assert chain.verdict() == "STATIC_CANDIDATE"
+
+    chain.add(
+        EvidenceItem(
+            EvidenceKind.REPRODUCTION,
+            "repro",
+            "reproduced",
+            True,
+            evidence_id="reproduction-1",
+        )
+    )
+
+    assert chain.verdict() == "STATIC_CANDIDATE"

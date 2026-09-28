@@ -85,3 +85,38 @@ def test_differential_scalar_alignment_is_explicit():
     assert result["applicable"] is True
     assert result["passed"] is True
     assert result["broadcast"]["semantic_axis"] == "scalar"
+
+def test_differential_contract_cannot_be_hidden_by_generic_match(tmp_path: Path):
+    from shap_review.differential.runner import differential_scripts
+
+    left = tmp_path / "left.py"
+    right = tmp_path / "right.py"
+
+    left.write_text(
+        "import json; print(json.dumps({'values':[1.0], 'base_values':[0.0]}))\n"
+    )
+    right.write_text(
+        "import json; print(json.dumps({'values':[1.0], 'base_values':[0.5]}))\n"
+    )
+
+    result = differential_scripts(left, right)
+
+    assert result["comparison"]["equal"] is False
+    assert result["contract_comparison"]["equal"] is False
+    assert result["equal"] is False
+
+def test_differential_requires_semantic_contract():
+    from shap_review.differential.semantic import compare_shap_contract
+
+    left = {
+        "values": [[1.0, 2.0]],
+        "base_values": [0.0],
+    }
+    right = {
+        "values": [[1.0, 2.0]],
+        "base_values": [0.0],
+    }
+
+    result = compare_shap_contract(left, right)
+
+    assert result["equal"] is True
