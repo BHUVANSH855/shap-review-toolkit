@@ -11,6 +11,9 @@ class EvidenceValidation:
     reason: str
     independent: bool | None = None
     missing: tuple[str, ...] = ()
+    schema_valid: bool = True
+    provenance_valid: bool = True
+    scoring_eligible: bool = True
 
 
 def validate_evidence_item(item: Any) -> EvidenceValidation:
@@ -45,10 +48,16 @@ def validate_evidence_item(item: Any) -> EvidenceValidation:
             "runtime provenance is missing; evidence is not eligible for independent scoring",
             independent=False,
             missing=tuple(missing),
+            schema_valid=True,
+            provenance_valid=False,
+            scoring_eligible=False,
         )
     return EvidenceValidation(
         True,
         "VALID",
         "minimum provenance present",
         independent=not bool(getattr(item, "derived_from", ())),
+        schema_valid=True,
+        provenance_valid=True,
+        scoring_eligible=not bool(getattr(item, "derived_from", ())),
     )

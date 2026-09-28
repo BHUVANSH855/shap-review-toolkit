@@ -47,7 +47,8 @@ def test_target_provenance_does_not_overclaim_model_api():
     assert p["target_source"] == "model_api"
     assert p["oracle_independence"] == "UNKNOWN"
     p = classify_target_provenance("independent_probability_fn", True)
-    assert p["oracle_independence"] == "PROVEN"
+    assert p["oracle_independence"] == "DECLARED"
+    assert p["independence_basis"] == "caller_declared"
 
 
 def test_interaction_oracle_requires_symmetry_and_reconstruction():

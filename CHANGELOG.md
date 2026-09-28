@@ -1,3 +1,19 @@
+# Changelog
+
+## 0.30.0
+
+### Correctness and release hardening
+
+- Restored `shap_review.run_script` from the canonical reproduction runner.
+- Restored the public fuzzing export from the implemented TreeExplainer oracle.
+- Fixed CPU/GPU differential comparison to use the canonical differential semantic comparator.
+- Added explicit oracle-independence state `DECLARED`; caller assertions no longer become `PROVEN` automatically.
+- Expanded evidence validation with schema/provenance/scoring-eligibility state.
+- Formalized regression outcomes including `AMBIGUOUS`, `TARGET_FAILURE`, `TOOLKIT_FAILURE`, and `UNSUPPORTED`.
+- Made semantic singleton broadcasting role-aware and fail-closed for contribution tensors.
+- Added release/import smoke checks and synchronized release metadata to 0.30.0 / schema 2.10.
+- Removed generated `.out` artifacts from the source distribution.
+
 # v0.28.0 — Semantic Consistency & Evidence Precision
 
 ## Focus

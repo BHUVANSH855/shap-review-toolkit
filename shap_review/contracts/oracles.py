@@ -20,6 +20,7 @@ class TargetSource(str, Enum):
 
 class OracleIndependence(str, Enum):
     PROVEN = "PROVEN"
+    DECLARED = "DECLARED"
     PARTIAL = "PARTIAL"
     UNKNOWN = "UNKNOWN"
 
@@ -39,14 +40,14 @@ def classify_target_provenance(
     elif raw in {"independent_probability_fn", "independent_function"}:
         source_kind = TargetSource.INDEPENDENT_FUNCTION.value
         independence = (
-            OracleIndependence.PROVEN.value
+            OracleIndependence.DECLARED.value
             if explicit_independent is True
             else OracleIndependence.PARTIAL.value
         )
     elif raw in {"supplied_external", "external_reference"}:
         source_kind = TargetSource.EXTERNAL_REFERENCE.value
         independence = (
-            OracleIndependence.PROVEN.value
+            OracleIndependence.DECLARED.value
             if explicit_independent is True
             else OracleIndependence.UNKNOWN.value
         )
@@ -56,10 +57,17 @@ def classify_target_provenance(
     else:
         source_kind = TargetSource.UNKNOWN.value
         independence = OracleIndependence.UNKNOWN.value
+    basis = (
+        "caller_declared"
+        if explicit_independent is True
+        else ("caller_declared_non_independent" if explicit_independent is False else "not_declared")
+    )
     return {
         "target_source": source_kind,
         "oracle_independence": independence,
         "explicit_independent": explicit_independent,
+        "independence_basis": basis,
+        "proof_required_for": OracleIndependence.PROVEN.value,
     }
 
 

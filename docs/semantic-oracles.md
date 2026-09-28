@@ -24,3 +24,14 @@ The output oracle reconstructs `base_values + SHAP contributions` and compares t
 ## Applicability
 
 Every required oracle must be either applicable and passing or the complete contract is `INCONCLUSIVE`. This prevents unavailable checks from silently becoming evidence of correctness.
+
+## Oracle independence states
+
+The toolkit distinguishes an oracle that is merely declared independent from one that is actually proven independent:
+
+- `UNKNOWN`: no independence basis is established.
+- `PARTIAL`: the source may be independent, but the available evidence is incomplete.
+- `DECLARED`: the caller explicitly asserted independence; this assertion is recorded but is not treated as proof.
+- `PROVEN`: the evidence pipeline established independence from an explicit proof basis.
+
+`DECLARED` evidence must not by itself promote a finding to `CONFIRMED`.

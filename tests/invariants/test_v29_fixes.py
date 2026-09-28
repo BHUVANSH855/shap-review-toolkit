@@ -1,4 +1,4 @@
-"""v0.29.0 — Tests for every correctness fix made in this release.
+"""v0.30.0 — Tests for every correctness fix made in this release.
 
 Each test is named after the specific finding it validates.
 """
@@ -479,4 +479,4 @@ def build(model):
 def test_version_is_v29():
     from shap_review.version import VERSION
 
-    assert VERSION == "0.29.0"
+    assert VERSION == "0.30.0"

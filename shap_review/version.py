@@ -1,5 +1,5 @@
-VERSION = "0.29.0"
-SCHEMA_VERSION = "2.9"
+VERSION = "0.30.0"
+SCHEMA_VERSION = "2.10"
 
 # Command order must match the adapter JSON manifests exactly.
 CAPABILITIES: tuple[str, ...] = (

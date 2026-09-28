@@ -60,12 +60,13 @@ def _arrays(case):
 
 
 def _canonical_reconstruction(values, base, *, interaction=False, model_output="raw"):
-    from shap_review.contracts.tensor import SHAPSemanticTensor
+    from shap_review.contracts.tensor import SHAPSemanticTensor, infer_axis_spec
 
     tensor = SHAPSemanticTensor.from_values(
         values,
         base_values=base,
         interaction=interaction,
+        axis_spec=infer_axis_spec(np.asarray(values), interaction=interaction),
         output_space=model_output,
         source_api="TreeExplainer.shap_values",
     )

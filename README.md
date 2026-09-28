@@ -1,8 +1,10 @@
-# SHAP Review Toolkit v0.29.0
+# SHAP Review Toolkit v0.30.0
 
 Evidence-driven, invariant-based, reproduction-first review tooling for [SHAP](https://github.com/shap/shap).
 
-## v0.29.0 — Correctness hardening, false-positive reduction & runtime bridge, release hygiene & provenance hardening
+## v0.30.0 — Runtime integrity, evidence-state hardening & release gating
+
+This release is a hardening release rather than a feature expansion. It restores the public import paths, aligns the fuzzing exports with the implemented TreeExplainer harness/oracle modules, tightens oracle-independence semantics, formalizes ambiguous regression outcomes, makes evidence validation explicit about scoring eligibility, hardens semantic alignment by role, and requires clean distribution archives.
 
 The current release hardens evidence provenance semantics: required oracles cannot silently disappear, oracle results expose requirement provenance and enforce state invariants, backend execution is routed through concrete adapters, differential results separate agreement from correctness, API-era analysis tracks scope/reassignment/conditional provenance, and CPU/GPU fingerprints are emitted by the target process itself. The CatBoost interventional reconstruction case remains candidate-only until cross-version confirmation.
 
@@ -208,3 +210,20 @@ pytest -q
 ```
 
 If an integration dependency is unavailable, dependency-gated integration tests are reported as skipped rather than being misclassified as toolkit failures. Runtime results must still be validated in an environment containing the relevant SHAP/backend packages before making repository-level claims.
+
+## Release hardening gate
+
+Before publishing a release archive, run the source smoke gate and the complete test suite:
+
+```text
+python scripts/release_check.py
+python -m pytest -q --disable-warnings
+```
+
+Then validate the exact archive that will be distributed:
+
+```text
+python scripts/validate_distribution.py <release.zip>
+```
+
+The archive validator must report `archive hygiene: PASS`. Generated `.out`, cache, bytecode, build, and local review artifacts are not release contents.

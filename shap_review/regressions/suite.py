@@ -4,6 +4,8 @@ import traceback
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from shap_review.types import RegressionStatus
+
 
 @dataclass
 class RegressionResult:
@@ -54,7 +56,7 @@ def run_4911():
             if is_nullable_error:
                 status = "reproduced"
             else:
-                status = "ambiguous_exception"
+                status = RegressionStatus.AMBIGUOUS.value
             return RegressionResult(
                 "SHAP-4911",
                 status,

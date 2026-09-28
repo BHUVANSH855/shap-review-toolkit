@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from shap_review.engine import ReviewEngine
-from shap_review.fuzzing import TreeExplainerFuzzer
+from shap_review.fuzzing.engine import TreeExplainerFuzzer
 
 
 def validate(root: str | Path, iterations: int = 10):

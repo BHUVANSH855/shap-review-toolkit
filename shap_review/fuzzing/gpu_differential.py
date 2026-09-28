@@ -55,6 +55,6 @@ class CPUGPUDifferential:
             return BackendRun(name, True, False, None, f"{type(exc).__name__}: {exc}")
 
     def _compare(self, a, b):
-        from .semantic import compare_shap_contract
+        from shap_review.differential.semantic import compare_shap_contract
 
         return compare_shap_contract(a, b, rtol=self.rtol, atol=self.atol)

@@ -72,6 +72,18 @@ class DifferentialStatus(str, Enum):
     EXECUTION_FAILED = "EXECUTION_FAILED"
 
 
+class RegressionStatus(str, Enum):
+    REPRODUCED = "reproduced"
+    NOT_REPRODUCED = "not_reproduced"
+    BLOCKED = "blocked"
+    AMBIGUOUS = "ambiguous"
+    TARGET_FAILURE = "target_failure"
+    TOOLKIT_FAILURE = "toolkit_failure"
+    UNSUPPORTED = "unsupported"
+    STATIC_PRECONDITION = "static_precondition"
+    CANDIDATE_REPRODUCED = "candidate_reproduced"
+
+
 @dataclass
 class EvidenceRef:
     kind: str

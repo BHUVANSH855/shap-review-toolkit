@@ -1,153 +1,93 @@
 from __future__ import annotations
 
-from pathlib import Path
+import random
 
-from shap_review.analyzers import (
-    CudaAnalyzer,
-    NanobindAnalyzer,
-    NativeBoundaryAnalyzer,
-    PythonContractAnalyzer,
-    SHAPSemanticAnalyzer,
-)
-from shap_review.candidates import CandidateAggregator
-from shap_review.discovery import (
-    BuildScanner,
-    ComponentScanner,
-    DependencyScanner,
-    HistoryScanner,
-    NativeScanner,
-    RepositoryScanner,
-    TestScanner,
-)
-from shap_review.evidence import EvidenceCorpus
-from shap_review.regressions import run_all
-from shap_review.runtime_bridge import attach_dynamic_evidence, run_bridge
-from shap_review.semantic import SHAPSemanticMapper
-from shap_review.semantic_ir import SemanticIRBuilder
-from shap_review.types import Candidate, write_json
-from shap_review.utils import fingerprint
+from .fuzzing.generators.input import generate_input_case
+from .fuzzing.generators.tree import generate_tree_case
+from .fuzzing.harnesses.treeexplainer import run_case
+from .fuzzing.minimizers.basic import minimize_case
+from .fuzzing.oracles.tree import evaluate_execution
 
 
-class ReviewEngine:
-    def _corpus(self, root):
-        local = Path(root) / "data/evidence/issues"
-        bundled = Path(__file__).resolve().parent / "resources/evidence/issues"
-        return EvidenceCorpus.from_directory(local if local.exists() else bundled)
+class TreeExplainerFuzzer:
+    def __init__(self, seed=0):
+        self.rng = random.Random(seed)
 
-    def discover(self, root: str | Path, out: str | Path | None = None) -> dict:
-        root = Path(root).resolve()
-        artifact = Path(out) if out else root / ".shap-review" / "discovery"
-        artifact.mkdir(parents=True, exist_ok=True)
-        data = {
-            "repository": RepositoryScanner().scan(root).__dict__,
-            "build": BuildScanner().scan(root),
-            "native": NativeScanner().scan(root),
-            "components": ComponentScanner().scan(root),
-            "dependencies": DependencyScanner().scan(root),
-            "tests": TestScanner().scan(root),
-            "history": HistoryScanner().scan(root),
-        }
-        write_json(artifact / "discovery.json", data)
-        graph = SHAPSemanticMapper().map(root)
-        graph.save(artifact / "semantic-graph.json")
-        ir = SemanticIRBuilder().build(root)
-        ir.save(artifact / "analysis-ir.json")
-        corpus = self._corpus(root)
-        corpus.save(artifact / "evidence-corpus.json")
-        write_json(artifact / "evidence-validation.json", corpus.validate())
-        issue_numbers = []
-        for record in corpus.records:
-            issue_numbers.extend(record.id.replace("SHAP-EVID-", "").split("-", 1)[:1])
-        history = HistoryScanner().scan(root, issue_numbers=issue_numbers)
-        write_json(artifact / "history.json", history)
-        data["history"] = history
-        return data | {
-            "semantic_graph": {"nodes": len(graph.nodes), "edges": len(graph.edges)},
-            "analysis_ir": {
-                "symbols": len(ir.symbols),
-                "calls": len(ir.calls),
-                "flows": len(ir.flows),
-                "properties": len(ir.properties),
-                "boundaries": len(ir.boundaries),
-            },
-            "evidence_records": len(corpus.records),
-            "evidence_errors": len(corpus.validate()),
-        }
-
-    def analyze(
-        self, root: str | Path, out: str | Path | None = None
-    ) -> list[Candidate]:
-        root = Path(root).resolve()
-        artifact = Path(out) if out else root / ".shap-review" / "candidates"
-        artifact.mkdir(parents=True, exist_ok=True)
-        ir = SemanticIRBuilder().build(root)
-        analyzers = [
-            PythonContractAnalyzer(),
-            SHAPSemanticAnalyzer(ir),
-            NativeBoundaryAnalyzer(ir),
-            NanobindAnalyzer(ir),
-            CudaAnalyzer(ir),
-        ]
-        raw = []
-        for analyzer in analyzers:
-            raw.extend(analyzer.analyze(root))
-        candidates = CandidateAggregator().merge(raw)
-
-        # Runtime oracle bridge: run a small deterministic fuzzing campaign and
-        # attach dynamic evidence to matching candidates.  No-ops when SHAP is
-        # not installed.  Results are stored alongside other artifacts.
-        bridge = run_bridge()
-        candidates = attach_dynamic_evidence(candidates, bridge)
-        write_json(
-            artifact / "runtime-bridge.json",
-            {
-                "available": bridge.get("available", False),
-                "anomalies": len(bridge.get("anomalies", [])),
-                "campaign_summary": bridge.get("campaign_summary", {}),
-            },
-        )
-
-        payload = []
-        for c in candidates:
-            payload.append(c.to_dict())
-        write_json(artifact / "signals.json", [{"analyzer": a.name} for a in analyzers])
-        write_json(artifact / "candidates.json", payload)
-        write_json(
-            artifact / "summary.json",
-            {
-                "raw_signals": len(raw),
-                "candidates": len(candidates),
-                "confidence": {
-                    "high": sum(c.confidence == "high" for c in candidates),
-                    "medium": sum(c.confidence == "medium" for c in candidates),
-                    "low": sum(c.confidence == "low" for c in candidates),
-                },
-            },
-        )
-        return candidates
-
-    def regressions(self, out: str | Path | None = None) -> dict:
-        results = [r.to_dict() for r in run_all()]
-        payload = {
-            "results": results,
-            "reproduced": sum(r["reproduced"] for r in results),
-            "blocked": sum(r["status"] == "blocked" for r in results),
-        }
-        if out:
-            write_json(Path(out) / "historical-regressions.json", payload)
-        return payload
-
-    def full_scan(self, root: str | Path) -> dict:
-        root = Path(root).resolve()
-        self.discover(root)
-        candidates = self.analyze(root)
-        regressions = self.regressions(root / ".shap-review")
+    @staticmethod
+    def _execution_trace(case: dict) -> dict:
         return {
-            "root": str(root),
-            "candidates": len(candidates),
-            "candidate_fingerprints": [
-                fingerprint(c.bug_class, c.file, str(c.line), c.message)
-                for c in candidates
-            ],
-            "historical_regressions": regressions,
+            k: case[k]
+            for k in (
+                "representation",
+                "background_representation",
+                "classification",
+                "model_output",
+                "interaction",
+                "dtype",
+                "nan",
+                "n_features",
+                "n_samples",
+                "n_trees",
+                "depth",
+            )
         }
+
+    def run(self, iterations=10):
+        results = []
+        for i in range(iterations):
+            case = generate_tree_case(self.rng)
+            generate_input_case(
+                self.rng
+            )  # consume RNG, but don't create dead dimensions
+            case["input"] = {
+                "samples": case["n_samples"],
+                "features": case["n_features"],
+                "dtype": case["dtype"],
+                "representation": case["representation"],
+                "nan": case["nan"],
+            }
+            case["seed"] = self.rng.randrange(2**31)
+            result = run_case(case)
+            oracle = evaluate_execution(result)
+            item = {
+                "iteration": i,
+                "case": case,
+                "execution_trace": self._execution_trace(case),
+                "execution": result,
+                "oracle": oracle,
+            }
+            if not oracle.get("valid") and result.get("executed"):
+                item["minimized_case"] = minimize_case(case)
+            results.append(item)
+        executed = [r for r in results if r["execution"].get("executed")]
+        return {
+            "iterations": iterations,
+            "results": results,
+            "executed_cases": len(executed),
+            "validated_cases": sum(r["oracle"].get("valid", False) for r in results),
+            "failures": sum(not r["oracle"].get("valid", False) for r in results),
+            "skipped_cases": sum(bool(r["execution"].get("skipped")) for r in results),
+            "coverage": self.coverage(results),
+        }
+
+    @staticmethod
+    def coverage(results: list[dict]) -> dict:
+        fields = [
+            "representation",
+            "background_representation",
+            "classification",
+            "model_output",
+            "interaction",
+            "dtype",
+            "nan",
+        ]
+        coverage = {}
+        for field in fields:
+            values = sorted({str(r["execution_trace"][field]) for r in results})
+            coverage[field] = {"observed": values, "count": len(values)}
+        coverage["interaction_executed"] = sum(
+            bool(r["execution"].get("interaction_executed"))
+            for r in results
+            if r["execution"].get("executed")
+        )
+        return coverage

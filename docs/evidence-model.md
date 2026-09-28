@@ -39,3 +39,16 @@ The same producer is **not** treated as correlated by itself. A validator may pr
 independent observations across separate executions. Correlation is established by
 shared execution/fixture, shared revision+environment where applicable, or explicit
 ancestry.
+
+
+## v0.30 evidence validation states
+
+Evidence validation now separates three questions that were previously easy to conflate:
+
+- `schema_valid`: the evidence object has the required structural fields.
+- `provenance_valid`: the runtime/source lineage is sufficient for the claimed evidence kind.
+- `scoring_eligible`: the evidence may participate in independent evidence scoring.
+
+An item can therefore be structurally valid while remaining `AMBIGUOUS` and ineligible for scoring when runtime provenance is incomplete. This is intentional fail-closed behavior.
+
+Oracle independence is also explicit: `DECLARED` means a caller asserted independence; it is not equivalent to `PROVEN`. `PROVEN` requires an actual proof basis supplied by the evidence pipeline.
