@@ -1,8 +1,8 @@
-# SHAP Review Toolkit v0.28.0
+# SHAP Review Toolkit v0.29.0
 
 Evidence-driven, invariant-based, reproduction-first review tooling for [SHAP](https://github.com/shap/shap).
 
-## v0.25 — Oracle completeness, release hygiene & provenance hardening
+## v0.29.0 — Correctness hardening, false-positive reduction & runtime bridge, release hygiene & provenance hardening
 
 The current release hardens evidence provenance semantics: required oracles cannot silently disappear, oracle results expose requirement provenance and enforce state invariants, backend execution is routed through concrete adapters, differential results separate agreement from correctness, API-era analysis tracks scope/reassignment/conditional provenance, and CPU/GPU fingerprints are emitted by the target process itself. The CatBoost interventional reconstruction case remains candidate-only until cross-version confirmation.
 

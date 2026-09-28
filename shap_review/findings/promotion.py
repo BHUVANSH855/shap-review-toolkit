@@ -48,14 +48,36 @@ class PromotionPolicy:
             target == FindingStatus.CONFIRMED
             and self.require_runtime_or_differential_for_confirmed
         ):
-            if chain is None or not any(
-                i.passed is True
-                and i.kind.value in {"dynamic", "differential", "reproduction"}
-                or (i.kind.value == "sanitizer" and i.details.get("finding") is True)
-                for i in chain.independent_items()
-            ):
+            qualifying = (
+                [
+                    i
+                    for i in chain.independent_items()
+                    if i.passed is True
+                    and (
+                        i.kind.value in {"dynamic", "reproduction"}
+                        or (
+                            i.kind.value == "sanitizer"
+                            and i.details.get("finding") is True
+                        )
+                        or (
+                            # Differential evidence qualifies ONLY when the reference
+                            # correctness is established — not merely when two executions
+                            # agree.  reference_correctness=UNKNOWN means we only know
+                            # they matched, not that either is correct.
+                            i.kind.value == "differential"
+                            and i.details.get("reference_correctness")
+                            not in {None, "UNKNOWN"}
+                        )
+                    )
+                ]
+                if chain is not None
+                else []
+            )
+            if not qualifying:
                 raise ValueError(
-                    "CONFIRMED requires positive runtime/differential/reproduction/sanitizer evidence"
+                    "CONFIRMED requires positive runtime, reproduction, or sanitizer evidence, "
+                    "or differential evidence with established reference correctness "
+                    "(differential agreement with reference_correctness=UNKNOWN is not sufficient)"
                 )
         if (
             target == FindingStatus.REPORTED

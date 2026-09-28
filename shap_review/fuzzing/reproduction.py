@@ -27,11 +27,26 @@ def reproduce_callable(
     metadata: dict[str, Any] | None = None,
 ) -> ReproductionResult:
     """Repeat a deterministic finding runner and record whether the outcome is stable."""
+
+    def _stable_default(obj):
+        """Convert numpy arrays to lists for stable cross-version serialisation.
+
+        Using default=str previously serialised arrays via repr(), which differs
+        across numpy versions (e.g. 0.99999999 vs 1.0) causing false stable=False.
+        """
+        if hasattr(obj, "tolist"):
+            return obj.tolist()
+        if hasattr(obj, "item"):
+            return obj.item()
+        return str(obj)
+
     outcomes = []
     count = max(2, runs)
     for _ in range(count):
         try:
-            outcomes.append(json.dumps(runner(), sort_keys=True, default=str))
+            outcomes.append(
+                json.dumps(runner(), sort_keys=True, default=_stable_default)
+            )
         except Exception as exc:
             outcomes.append(f"EXCEPTION:{type(exc).__name__}:{exc}")
     try:

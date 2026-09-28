@@ -388,18 +388,24 @@ class InteractionOracle:
             np.allclose(iv, np.swapaxes(iv, pair[0], pair[1]), equal_nan=True)
         )
         if values is None:
+            # Symmetry alone is INCONCLUSIVE — a symmetric but semantically wrong
+            # tensor would previously return passed=True here, creating a false
+            # positive.  Without a reference SHAP-values tensor we cannot verify
+            # reconstruction so we must return passed=None (INCONCLUSIVE).
             return OracleResult(
                 "InteractionOracle",
-                True,
-                symmetric,
-                "interaction matrix is symmetric"
-                if symmetric
-                else "interaction matrix is not symmetric",
+                True,  # applicable=True (we can check symmetry)
+                None,  # passed=None → INCONCLUSIVE, not a passing result
+                "interaction symmetry "
+                + ("satisfied" if symmetric else "violated")
+                + "; reconstruction cannot be checked without reference values — result is INCONCLUSIVE",
                 details={
                     "interaction_feature_axes": list(pair),
                     "output_axis": spec.output_axis,
                     "symmetry_checked": True,
+                    "symmetry_passed": symmetric,
                     "reconstruction_checked": False,
+                    "inconclusive_reason": "reference_values_required_for_reconstruction",
                 },
             )
         direct = np.asarray(values, dtype=float)

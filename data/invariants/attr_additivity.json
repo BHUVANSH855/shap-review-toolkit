@@ -1,1 +1,21 @@
-{"id":"INV-ATTR-001","name":"TreeExplainer additivity","category":"attribution","description":"Feature contributions plus the expected/base value must match the model output in the configured output space when the documented preconditions hold.","applies_to":["TreeExplainer"],"evidence":["official TreeExplainer documentation","issue-4869","issue-2778","issue-1539"],"oracle":"numeric_additivity","validation":["dynamic","differential","fuzz"]}
+{
+  "id": "INV-ATTR-001",
+  "name": "TreeExplainer additivity",
+  "category": "attribution",
+  "description": "Feature contributions plus the expected/base value must match the model output in the configured output space when the documented preconditions hold.",
+  "applies_to": [
+    "TreeExplainer"
+  ],
+  "evidence": [
+    "official TreeExplainer documentation",
+    "issue-4869",
+    "issue-2778",
+    "issue-1539"
+  ],
+  "validation": [
+    "dynamic",
+    "differential",
+    "fuzz"
+  ],
+  "oracle_name": "numeric_additivity"
+}

@@ -1,8 +1,8 @@
-"""Canonical release metadata for SHAP Review Toolkit."""
-
-VERSION = "0.28.0"
+VERSION = "0.29.0"
 SCHEMA_VERSION = "2.9"
-CAPABILITIES = (
+
+# Command order must match the adapter JSON manifests exactly.
+CAPABILITIES: tuple[str, ...] = (
     "map",
     "health",
     "analyze",
@@ -31,10 +31,12 @@ CAPABILITIES = (
 
 
 def release_metadata(provider: str = "generic") -> dict:
+    """Return structured release metadata for the capabilities command."""
     return {
-        "provider": provider,
         "version": VERSION,
         "toolkit_version": VERSION,
         "schema_version": SCHEMA_VERSION,
+        "provider": provider,
+        "capabilities": list(CAPABILITIES),
         "commands": list(CAPABILITIES),
     }

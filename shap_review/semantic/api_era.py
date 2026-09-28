@@ -293,6 +293,22 @@ def scan_api_era(source: str) -> list[dict]:
                     add_call_finding(
                         call, ctor_state(fn.func, scope), scope, ast.unparse(fn.func)
                     )
+            elif isinstance(node, ast.Return) and node.value is not None:
+                # FIX: detect TreeExplainer / Explainer calls in return statements.
+                # Previously only assignment statements (ast.Assign) were tracked
+                # for binding — this missed the common pattern:
+                #   def build(model): return shap.TreeExplainer(model, model_output="...")
+                ret = node.value
+                if isinstance(ret, ast.Call):
+                    state = ctor_state(ret.func, scope)
+                    if state in {"SHAP", "MAYBE_SHAP"}:
+                        add_call_finding(
+                            ret,
+                            state,
+                            scope,
+                            ast.unparse(ret.func),
+                            api="TreeExplainer.__call__",
+                        )
             elif isinstance(node, ast.Call):
                 fn = node.func
                 if isinstance(fn, ast.Attribute) and fn.attr == "shap_values":

@@ -153,16 +153,30 @@ def _align_base(
             if axes.output_axis is not None and axes.output_axis < len(target_shape)
             else (len(target_shape) - 1 if axes.output_axis is not None else None)
         )
-        if output_axis is not None and base.shape[0] == target_shape[output_axis]:
+        # Ambiguity guard: when n_samples == n_classes both the output_axis and
+        # sample_axis branches would match, producing a silently wrong broadcast.
+        # Raise an explicit error so the caller must supply an axis_spec.
+        sample_matches = (
+            axes.sample_axis < len(target_shape)
+            and base.shape[0] == target_shape[axes.sample_axis]
+        )
+        output_matches = (
+            output_axis is not None and base.shape[0] == target_shape[output_axis]
+        )
+        if output_matches and sample_matches and output_axis != axes.sample_axis:
+            raise ValueError(
+                f"Ambiguous 1-D baseline shape {base.shape}: matches both "
+                f"output_axis={output_axis} and sample_axis={axes.sample_axis} "
+                f"in target shape {target_shape}.  Provide an explicit axis_spec "
+                f"so the correct semantic axis can be determined."
+            )
+        if output_matches:
             shape = [1] * len(target_shape)
             shape[output_axis] = base.shape[0]
             return np.broadcast_to(base.reshape(shape), target_shape)
         if base.shape[0] == 1:
             return np.broadcast_to(base.reshape([1] * len(target_shape)), target_shape)
-        if (
-            axes.sample_axis < len(target_shape)
-            and base.shape[0] == target_shape[axes.sample_axis]
-        ):
+        if sample_matches:
             shape = [1] * len(target_shape)
             shape[axes.sample_axis] = base.shape[0]
             return np.broadcast_to(base.reshape(shape), target_shape)

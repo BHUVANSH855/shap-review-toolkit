@@ -21,6 +21,7 @@ from shap_review.discovery import (
 )
 from shap_review.evidence import EvidenceCorpus
 from shap_review.regressions import run_all
+from shap_review.runtime_bridge import attach_dynamic_evidence, run_bridge
 from shap_review.semantic import SHAPSemanticMapper
 from shap_review.semantic_ir import SemanticIRBuilder
 from shap_review.types import Candidate, write_json
@@ -91,6 +92,21 @@ class ReviewEngine:
         for analyzer in analyzers:
             raw.extend(analyzer.analyze(root))
         candidates = CandidateAggregator().merge(raw)
+
+        # Runtime oracle bridge: run a small deterministic fuzzing campaign and
+        # attach dynamic evidence to matching candidates.  No-ops when SHAP is
+        # not installed.  Results are stored alongside other artifacts.
+        bridge = run_bridge()
+        candidates = attach_dynamic_evidence(candidates, bridge)
+        write_json(
+            artifact / "runtime-bridge.json",
+            {
+                "available": bridge.get("available", False),
+                "anomalies": len(bridge.get("anomalies", [])),
+                "campaign_summary": bridge.get("campaign_summary", {}),
+            },
+        )
+
         payload = []
         for c in candidates:
             payload.append(c.to_dict())

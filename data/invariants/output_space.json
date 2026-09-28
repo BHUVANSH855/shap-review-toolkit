@@ -1,1 +1,19 @@
-{"id":"INV-OUT-001","name":"Output-space consistency","category":"output","description":"Requested model_output must remain consistent across TreeExplainer configuration, internal model representation, native execution and the final oracle.","applies_to":["TreeExplainer"],"evidence":["TreeExplainer documentation","issue-5098","issue-5014"],"oracle":"semantic_trace","validation":["static","dynamic"]}
+{
+  "id": "INV-OUT-001",
+  "name": "Output-space consistency",
+  "category": "output",
+  "description": "Requested model_output must remain consistent across TreeExplainer configuration, internal model representation, native execution and the final oracle.",
+  "applies_to": [
+    "TreeExplainer"
+  ],
+  "evidence": [
+    "TreeExplainer documentation",
+    "issue-5098",
+    "issue-5014"
+  ],
+  "validation": [
+    "static",
+    "dynamic"
+  ],
+  "oracle_name": "semantic_trace"
+}

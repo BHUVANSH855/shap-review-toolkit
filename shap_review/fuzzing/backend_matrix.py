@@ -232,20 +232,45 @@ def _model_for(spec, mod, classification=False):
 
 
 def _classify_exception(exc, stage="unknown"):
-    """Classify by the execution stage first; message text is only a fallback hint."""
+    """Classify by the execution stage first; exception type and message are
+    secondary refinements that prevent resource errors and unsupported configs
+    from being reported as SHAP bugs.
+    """
+    exc_type = type(exc).__name__
+    msg = str(exc).lower()
+
+    # Resource / environment errors are never SHAP bugs
+    if exc_type in (
+        "MemoryError",
+        "RecursionError",
+        "KeyboardInterrupt",
+        "SystemExit",
+        "TimeoutError",
+    ):
+        return "TOOLKIT_ERROR"
+
+    # Unsupported configuration: SHAP deliberately rejects these
+    if (
+        "not implemented" in msg
+        or "unsupported" in msg
+        or "not supported" in msg
+        or exc_type == "NotImplementedError"
+    ):
+        return "UNSUPPORTED"
+
+    # Stage-based classification (primary signal)
     if stage in {"model_build", "model_fit"}:
         return "BACKEND_ERROR"
-    if stage == "explainer_create" or stage == "explainer_execute":
+    if stage in {"explainer_create", "explainer_execute"}:
+        # Stage is in SHAP territory but may still be a backend serialization
+        # error triggered inside SHAP code; label as SHAP_ERROR but caller
+        # should inspect the stack before promoting to a confirmed finding.
         return "SHAP_ERROR"
-    if stage == "output_normalization":
-        return "TOOLKIT_ERROR"
-    if stage == "oracle":
+    if stage in {"output_normalization", "oracle"}:
         return "TOOLKIT_ERROR"
     if stage == "representation":
         return "ADAPTER_ERROR"
-    msg = str(exc).lower()
-    if "unsupported" in msg or "not implemented" in msg:
-        return "UNSUPPORTED"
+
     return "ADAPTER_ERROR"
 
 

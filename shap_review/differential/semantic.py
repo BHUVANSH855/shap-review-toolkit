@@ -37,6 +37,7 @@ def normalize_shap_result(value: Any) -> Any:
             "feature_names",
             "output_names",
             "output_indexes",
+            "expected_value",  # FIX: was missing; scalar vs array vs list shapes vary by model type
         ):
             if hasattr(value, name):
                 result[name] = normalize_shap_result(getattr(value, name))

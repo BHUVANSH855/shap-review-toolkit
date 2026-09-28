@@ -32,20 +32,47 @@ def run_4911():
         try:
             shap.TreeExplainer(model, data=X)
         except Exception as exc:
+            exc_type = type(exc).__name__
+            exc_msg = str(exc).lower()
+            # Only mark as reproduced when the exception is clearly caused by the
+            # nullable dtype / object-dtype reaching native processing — not by
+            # an unrelated error (e.g. wrong background shape, MemoryError).
+            nullable_keywords = {
+                "int64",
+                "nullable",
+                "object",
+                "cannot convert",
+                "unsupported dtype",
+                "invalid dtype",
+                "float conversion",
+                "expected float",
+                "buffer",
+            }
+            is_nullable_error = exc_type in ("TypeError", "ValueError") and any(
+                kw in exc_msg for kw in nullable_keywords
+            )
+            if is_nullable_error:
+                status = "reproduced"
+            else:
+                status = "ambiguous_exception"
             return RegressionResult(
                 "SHAP-4911",
-                "reproduced",
-                True,
+                status,
+                is_nullable_error,
                 "nullable background must be converted or clearly rejected",
-                f"{type(exc).__name__}: {exc}",
-                {"shap_version": shap.__version__},
+                f"{exc_type}: {exc}",
+                {
+                    "shap_version": shap.__version__,
+                    "exception_type": exc_type,
+                    "is_nullable_error": is_nullable_error,
+                },
             )
         return RegressionResult(
             "SHAP-4911",
             "not_reproduced",
             False,
             "nullable background failure on affected versions",
-            "constructor succeeded",
+            "constructor succeeded — nullable dtype was handled without error",
             {"shap_version": shap.__version__},
         )
     except Exception as exc:

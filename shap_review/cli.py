@@ -106,7 +106,7 @@ def dispatch(
         return HealthReport().run(root)
     if command == "analyze":
         return {
-            "candidates": [c.__dict__ for c in eng.analyze(root, arguments.get("out"))]
+            "candidates": [c.to_dict() for c in eng.analyze(root, arguments.get("out"))]
         }
     if command == "report":
         cs = eng.analyze(root)
@@ -331,19 +331,14 @@ def main(argv=None):
         cs = eng.analyze(args.root)
         print(
             json.dumps(
-                {"candidates": len(cs), "items": [c.__dict__ for c in cs]},
-                default=lambda x: x.__dict__,
+                {"candidates": len(cs), "items": [c.to_dict() for c in cs]},
                 indent=2,
             )
         )
     elif args.cmd == "report":
         cs = eng.analyze(args.root)
         if args.format == "json":
-            print(
-                json.dumps(
-                    [c.__dict__ for c in cs], default=lambda x: x.__dict__, indent=2
-                )
-            )
+            print(json.dumps([c.to_dict() for c in cs], indent=2))
         else:
             print(render_candidates(cs))
     elif args.cmd == "hotspots":

@@ -34,11 +34,17 @@ class PythonContractAnalyzer(Analyzer):
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
-                tags = []
-                body = ast.get_source_segment(text, node) or ""
-                for token in RULES:
-                    if token in body:
-                        tags.append(token)
+                # Extract only AST-level Name and Attribute identifiers from the
+                # function body.  ast.get_source_segment() previously included raw
+                # text (comments, docstrings, string literals) which caused tokens
+                # appearing only in comments to produce false candidates.
+                body_names: set[str] = set()
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Name):
+                        body_names.add(sub.id)
+                    elif isinstance(sub, ast.Attribute):
+                        body_names.add(sub.attr)
+                tags = [token for token in RULES if token in body_names]
                 if not tags or node.name not in {
                     "shap_values",
                     "shap_interaction_values",

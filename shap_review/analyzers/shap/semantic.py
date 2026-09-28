@@ -55,8 +55,20 @@ class SHAPSemanticAnalyzer(Analyzer):
                 )
             )
         # High-value input conversion path: DataFrame -> numpy-like value -> Tree/native path.
+        # Only flag pandas->numpy conversions in files that also contain a
+        # TreeExplainer call.  Without this guard, any pandas preprocessing
+        # code in the analysed repository fires as a SHAP-05 candidate.
+        files_with_shap_calls = {
+            call.file
+            for call in ir.calls
+            if call.callee
+            in {"TreeExplainer", "shap.TreeExplainer", "Explainer", "shap.Explainer"}
+        }
         for flow in ir.flows:
-            if flow.source == "pandas-like input":
+            if (
+                flow.source == "pandas-like input"
+                and flow.file in files_with_shap_calls
+            ):
                 out.append(
                     self._candidate(
                         root,
@@ -71,6 +83,9 @@ class SHAPSemanticAnalyzer(Analyzer):
                     )
                 )
         # Compatibility path for a standalone method fixture with no constructor call.
+        # Guard: only activate when the file actually imports from shap.
+        # Without this guard the fallback fires on any custom attribution library
+        # or mock class that has functions named shap_values / interaction_values.
         if not out:
             for p in iter_source_files(root):
                 if p.suffix != ".py":
@@ -79,6 +94,20 @@ class SHAPSemanticAnalyzer(Analyzer):
                 try:
                     tree = ast.parse(text)
                 except SyntaxError:
+                    continue
+                # Require an actual shap import before activating fallback.
+                has_shap_import = any(
+                    (
+                        isinstance(n, ast.Import)
+                        and any(alias.name == "shap" for alias in n.names)
+                    )
+                    or (
+                        isinstance(n, ast.ImportFrom)
+                        and (n.module or "").split(".")[0] == "shap"
+                    )
+                    for n in ast.walk(tree)
+                )
+                if not has_shap_import:
                     continue
                 for node in ast.walk(tree):
                     if isinstance(
@@ -149,7 +178,18 @@ class SHAPSemanticAnalyzer(Analyzer):
     ):
         file = file or obj.file
         line = line if line is not None else obj.line
+        # Always include a static/source EvidenceRef documenting the IR signal.
+        # This gives the evidence chain two independent kinds (historical + static)
+        # so it can reach HISTORICALLY_CORRELATED rather than remaining UNVALIDATED.
         refs = [
+            EvidenceRef(
+                "source",
+                "SHAP semantic IR",
+                f"IR call-site or flow detected at {file}:{line}",
+                2,
+            )
+        ]
+        refs += [
             EvidenceRef("issue", r.id, r.title, 4) for r in corpus.by_bug_class(bug)[:2]
         ]
         return Candidate(

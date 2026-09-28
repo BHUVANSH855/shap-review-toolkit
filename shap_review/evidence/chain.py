@@ -30,12 +30,19 @@ def build_chain(
     for idx, e in enumerate(entries, 1):
         raw_kind = e["kind"]
         kind = legacy.get(raw_kind, raw_kind)
-        origin = e.get(
-            "origin",
-            "derived"
-            if raw_kind in {"issue", "pull_request", "test-gap"}
-            else "source",
-        )
+        # Historical evidence (issues, PRs) comes from an external corpus record —
+        # it is an independently verifiable public artifact, NOT a derived observation.
+        # Using "derived" caused every corpus-linked candidate to score 0.0.
+        # "source" evidence (AST patterns) originates from the analysed source tree.
+        # Only dynamic/reproduction/differential evidence computed inside a single
+        # run should be marked "derived".
+        if raw_kind in {"issue", "pull_request"}:
+            default_origin = "external"
+        elif raw_kind in {"test-gap"}:
+            default_origin = "derived"
+        else:
+            default_origin = "source"
+        origin = e.get("origin", default_origin)
         chain.add(
             EvidenceItem(
                 kind=EvidenceKind(kind),

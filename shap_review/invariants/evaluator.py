@@ -14,17 +14,44 @@ class OracleResult:
 def numeric_additivity(
     values, base_values, model_output, rtol=1e-2, atol=1e-6
 ) -> OracleResult:
+    """Check additivity: base_values + sum_over_features(values) == model_output.
+
+    Uses the canonical SHAPSemanticTensor / contracts/tensor.py path so that
+    multiclass (3-D) and interaction (4-D) tensors reduce over the correct
+    feature axis rather than blindly summing axis=-1 (which sums the *class*
+    axis for 3-D tensors and silently produces a wrong result).
+    """
     import numpy as np
 
-    lhs = np.asarray(base_values) + np.asarray(values).sum(axis=-1)
-    rhs = np.asarray(model_output)
-    ok = np.allclose(lhs, rhs, rtol=rtol, atol=atol, equal_nan=False)
-    err = np.max(np.abs(lhs - rhs)) if lhs.size else 0.0
-    return OracleResult(
-        bool(ok),
-        "additivity holds" if ok else f"additivity mismatch; max_abs_error={err}",
-        {"max_abs_error": float(err), "rtol": rtol, "atol": atol},
-    )
+    from shap_review.contracts.tensor import SHAPSemanticTensor
+
+    try:
+        tensor = SHAPSemanticTensor.from_values(values, base_values=base_values)
+        reconstructed = np.asarray(tensor.reconstruction())
+        rhs = np.asarray(model_output, dtype=float)
+        ok = np.allclose(reconstructed, rhs, rtol=rtol, atol=atol, equal_nan=False)
+        err = float(np.max(np.abs(reconstructed - rhs))) if reconstructed.size else 0.0
+        return OracleResult(
+            bool(ok),
+            "additivity holds"
+            if ok
+            else f"additivity mismatch; max_abs_error={err:.6g}",
+            {
+                "max_abs_error": err,
+                "rtol": rtol,
+                "atol": atol,
+                "values_shape": list(np.asarray(values).shape),
+                "reconstructed_shape": list(reconstructed.shape),
+                "target_shape": list(rhs.shape),
+                "feature_axis": tensor.axis_spec.feature_axis,
+            },
+        )
+    except (ValueError, TypeError) as exc:
+        return OracleResult(
+            False,
+            f"additivity check failed: {exc}",
+            {"error": str(exc)},
+        )
 
 
 def shape_equal(actual, expected) -> OracleResult:

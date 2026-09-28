@@ -1,1 +1,20 @@
-{"id":"INV-SHAPE-001","name":"Explanation shape consistency","category":"shape","description":"Documented single-output, multi-output and interaction shape conventions must be preserved across explainer execution and Explanation construction.","applies_to":["TreeExplainer","Explanation"],"evidence":["TreeExplainer documentation","issue-4495","issue-4869"],"oracle":"shape_equal","validation":["static","dynamic"]}
+{
+  "id": "INV-SHAPE-001",
+  "name": "Explanation shape consistency",
+  "category": "shape",
+  "description": "Documented single-output, multi-output and interaction shape conventions must be preserved across explainer execution and Explanation construction.",
+  "applies_to": [
+    "TreeExplainer",
+    "Explanation"
+  ],
+  "evidence": [
+    "TreeExplainer documentation",
+    "issue-4495",
+    "issue-4869"
+  ],
+  "validation": [
+    "static",
+    "dynamic"
+  ],
+  "oracle_name": "shape_equal"
+}
