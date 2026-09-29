@@ -529,3 +529,34 @@ def test_promotion_requires_runtime_evidence():
             FindingStatus.REPRODUCED,
             chain,
         )
+
+def test_evidence_same_execution_lineage_is_not_independent():
+    from shap_review.evidence.chain import build_chain
+
+    chain = build_chain(
+        entries=[
+            {"kind": "dynamic", "source": "a", "claim": "a", "passed": True,
+             "evidence_id": "a", "details": {"execution_id": "run1"}},
+            {"kind": "differential", "source": "b", "claim": "b", "passed": True,
+             "evidence_id": "b", "details": {"execution_id": "run1"}},
+        ]
+    )
+    assert not chain.graph.is_independent("a", "b")
+    assert chain.graph.independence_reason("a", "b") == "shared-execution-lineage"
+
+
+def test_evidence_same_revision_and_environment_is_not_independent():
+    from shap_review.evidence.graph import EvidenceGraph, EvidenceNode
+
+    graph = EvidenceGraph()
+    environment = {"python": "3.13", "shap": "0.50.0"}
+    graph.add(EvidenceNode("a", "dynamic", "a", "p1", "a", True,
+                           execution_id="e1", repository_revision="r1", environment=environment))
+    graph.add(EvidenceNode("b", "differential", "b", "p2", "b", True,
+                           execution_id="e2", repository_revision="r1", environment=environment))
+    assert not graph.is_independent("a", "b")
+    assert graph.independence_reason("a", "b") == "shared-revision-environment"
+
+
+
+

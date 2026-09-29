@@ -25,30 +25,41 @@ class CandidateAggregator:
         for c in candidates:
             key = (c.bug_class, c.file, c.line, c.invariant)
             groups[key].append(c)
+
         out = []
-        for _, group in groups.items():
+        for group in groups.values():
             base = group[0]
             evidence = []
             tags = []
             messages = []
             seen_e = set()
+
             for c in group:
                 messages.append(c.message)
                 tags.extend(c.tags)
+
                 for e in c.evidence:
                     k = (e.kind, e.source, e.note)
                     if k not in seen_e:
                         seen_e.add(k)
                         evidence.append(e)
-            score = sum(EVIDENCE_TIER.get(e.kind, max(1, e.strength)) for e in evidence)
+
+            score = sum(
+                EVIDENCE_TIER.get(e.kind, max(1, e.strength))
+                for e in evidence
+            )
             independent_kinds = len({e.kind for e in evidence})
-            # NOTE: the (len(group)-1)*2 group-size bonus has been removed.
+
             # Multiple analyzers firing on the same location is NOT independent
-            # evidence — they all derive from the same source code. Counting it
-            # as corroboration inflated confidence on pure pattern matches.
-            # The independent_kinds bonus is kept: genuinely different evidence
-            # types (e.g. issue + dynamic) DO add information.
+            # evidence. They all derive from the same source code, so counting
+            # them as corroboration would inflate confidence on pure pattern
+            # matches.
+            #
+            # Genuinely different evidence types (for example, issue + dynamic)
+            # do provide additional information, so their diversity contributes
+            # a small bonus.
             score += max(0, independent_kinds - 1) * 2
+
             confidence = (
                 "high"
                 if score >= 14 and independent_kinds >= 2
@@ -56,6 +67,7 @@ class CandidateAggregator:
                 if score >= 7
                 else "low"
             )
+
             chain_entries = [
                 {
                     "kind": e.kind,
@@ -63,17 +75,22 @@ class CandidateAggregator:
                     "claim": e.note,
                     "passed": True,
                     "confidence": min(
-                        1.0, max(0.1, e.strength / 10 if e.strength else 1.0)
+                        1.0,
+                        max(0.1, e.strength / 10 if e.strength else 1.0),
                     ),
                     # Historical corpus records are external facts, not derived
                     # observations from the current analysis run.
-                    "origin": "external"
-                    if e.kind in {"issue", "pull_request"}
-                    else "source",
+                    "origin": (
+                        "external"
+                        if e.kind in {"issue", "pull_request"}
+                        else "source"
+                    ),
                 }
                 for e in evidence
             ]
+
             chain = build_chain(entries=chain_entries)
+
             out.append(
                 Candidate(
                     base.candidate_id,
@@ -90,4 +107,8 @@ class CandidateAggregator:
                     evidence_chain=chain,
                 )
             )
-        return sorted(out, key=lambda c: (c.file, c.line or 0, c.bug_class))
+
+        return sorted(
+            out,
+            key=lambda c: (c.file, c.line or 0, c.bug_class),
+        )

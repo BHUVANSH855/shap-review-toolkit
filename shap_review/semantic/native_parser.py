@@ -23,6 +23,7 @@ class NativeParser:
     def parse(self, path: str | Path) -> dict:
         p = Path(path)
         text = p.read_text(encoding="utf-8", errors="replace")
+
         try:
             import tree_sitter_cpp
             from tree_sitter import Language, Parser
@@ -35,7 +36,7 @@ class NativeParser:
                 "errors": tree.root_node.has_error,
                 "symbols": self._tree_symbols(tree.root_node, text),
             }
-        except Exception:
+        except (ImportError, ModuleNotFoundError, TypeError, ValueError):
             return {
                 "engine": "fallback",
                 "root_type": "translation_unit",
@@ -44,7 +45,6 @@ class NativeParser:
             }
 
     def _tree_symbols(self, node, text):
-        lines = text.splitlines()
         out = []
 
         def walk(n):

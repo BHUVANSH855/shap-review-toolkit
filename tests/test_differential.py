@@ -153,3 +153,22 @@ def test_cpu_gpu_script_differential_reports_semantic_fields(tmp_path):
 
     assert result["applicable"]
     assert result["semantic_equal"]
+
+def test_canonical_additivity_does_not_guess_equal_output_dimensions():
+    import numpy as np
+
+    from shap_review.differential.semantic import evaluate_additivity
+
+    result = evaluate_additivity(np.ones((1, 2, 2)), np.zeros(2), np.array([2.0, 2.0]), interaction=False)
+    assert result["applicable"] and result["passed"]
+
+
+def test_differential_uses_canonical_semantic_tensor():
+    import numpy as np
+
+    from shap_review.differential.semantic import evaluate_additivity
+
+    result = evaluate_additivity(
+        np.ones((2, 3, 2)), np.zeros((2, 2)), np.full((2, 2), 3.0)
+    )
+    assert result["passed"] is True

@@ -278,3 +278,9 @@ def test_provider_manifest_missing_top_level_commands_fails():
             SCHEMA_VERSION,
             VERSION,
         )
+
+def test_backend_adapter_protocol_is_exported():
+    from shap_review.backends import BackendAdapter, BackendExecution
+
+    assert BackendAdapter is not None
+    assert "status" in BackendExecution.__annotations__

@@ -396,3 +396,104 @@ def test_native_map_has_expected_layers(tmp_path: Path):
     }
 
     assert {"cutils", "cext"} <= names
+
+def test_interaction_multiclass_uses_feature_pair_axes_before_output_axis():
+    import numpy as np
+
+    from shap_review.contracts import SHAPContract
+    from shap_review.contracts.oracles import InteractionOracle
+
+    contract = SHAPContract("TreeExplainer", "tree", interaction=True)
+    values = np.zeros((1, 2, 2, 3))
+    values[:, 0, 1, :] = 1
+    values[:, 1, 0, :] = 1
+    result = InteractionOracle().check(values=values, interaction_values=values, axes=contract.axis_spec)
+    assert result.passed is True
+    assert result.details["interaction_feature_axes"] == [1, 2]
+
+
+def test_api_era_ignores_arbitrary_nested_callable():
+    from shap_review.semantic.api_era import scan_api_era
+
+    findings = scan_api_era("foo = make_factory(); y = foo(X)\n")
+    assert not any(f["api"] == "Explainer.__call__" for f in findings)
+
+
+def test_api_era_detects_direct_treeexplainer_callable():
+    from shap_review.semantic.api_era import scan_api_era
+
+    findings = scan_api_era("import shap\ny = shap.TreeExplainer(model)(X)\n")
+    assert any(f["api"] == "Explainer.__call__" for f in findings)
+
+
+def test_api_era_scope_alias_reassignment_invalidates_provenance():
+    from shap_review.semantic.api_era import scan_api_era
+
+    source = "from shap import TreeExplainer\nTreeExplainer = unrelated_factory\ne = TreeExplainer(model)\ne(X)\n"
+    assert not any(f["api"] == "Explainer.__call__" for f in scan_api_era(source))
+
+
+def test_api_era_scope_isolated_between_functions():
+    from shap_review.semantic.api_era import scan_api_era
+
+    source = (
+        "import shap\n"
+        "def foo():\n e=shap.TreeExplainer(model)\n return e\n"
+        "def bar():\n e=other_factory()\n e(X)\n"
+    )
+    calls = [f for f in scan_api_era(source) if f["api"] == "Explainer.__call__"]
+    assert len(calls) == 0 or all(f["scope"] == "foo" for f in calls)
+
+
+def test_api_era_conditional_callable_has_medium_confidence():
+    from shap_review.semantic.api_era import scan_api_era
+
+    source = "import shap\nif flag:\n e=shap.TreeExplainer(model)\nelse:\n e=other_factory()\ne(X)\n"
+    findings = scan_api_era(source)
+    assert any(f["api"] == "Explainer.__call__" and f["confidence"] == "medium" for f in findings)
+
+
+def test_api_era_nested_scope_is_preserved():
+    from shap_review.semantic.api_era import scan_api_era
+
+    findings = scan_api_era("""import shap
+def foo():
+    e=shap.TreeExplainer(model)
+    def inner():
+        e(X)
+    inner()
+""")
+    calls = [f for f in findings if f["api"] == "Explainer.__call__"]
+    assert calls and calls[0]["scope"] == "inner"
+
+
+def test_api_era_shadowing_does_not_promote_non_shap_callable():
+    from shap_review.semantic.api_era import scan_api_era
+
+    findings = scan_api_era("""import shap
+e=shap.TreeExplainer(model)
+e=other_factory()
+e(X)
+""")
+    assert not [f for f in findings if f["api"] == "Explainer.__call__"]
+
+
+def test_subprocess_environment_fingerprint_comes_from_child_process(tmp_path):
+    from shap_review.differential.runner import run_json_script
+
+    script = tmp_path / "emit.py"
+    script.write_text("import json; print(json.dumps({'value': 1}))")
+    result = run_json_script(script, capture_environment=True)
+    assert result["ok"] is True
+    assert result["subprocess_environment"]["executable"]
+    assert result["subprocess_environment"]["python"]
+
+
+def test_native_map_reports_source_symbols(tmp_path):
+    from shap_review.native.shap_map import map_shap_native
+
+    path = tmp_path / "shap" / "cext"
+    path.mkdir(parents=True)
+    (path / "_cext.cpp").write_text("int tree_shap_value(double x) { return 0; }\n")
+    result = map_shap_native(str(tmp_path))
+    assert any(symbol["symbol"] == "tree_shap_value" for symbol in result["symbols"])

@@ -272,8 +272,11 @@ class MatrixBackendAdapter:
                 "log_loss_independent": float(np.mean(independent)),
                 "log_loss_max_error": err,
                 "probability_oracle": probability_oracle,
-                "oracle": {"status": "ORACLE_PASS" if passed else "SEMANTIC_MISMATCH"},
+                "oracle": {
+                    "status": "ORACLE_PASS" if passed else "SEMANTIC_MISMATCH"
+                },
             }
+
         target = c["target"]
         passed, err, oracle = _semantic_additivity(
             values,
@@ -369,7 +372,10 @@ class MatrixBackendAdapter:
                 "stage": stage,
                 "reason": str(exc),
             }
-        except Exception as exc:
+        # This is an intentional lifecycle boundary: backend, SHAP, and toolkit
+        # exceptions must be converted into structured execution results rather
+        # than escaping and aborting the campaign.
+        except Exception as exc:  # noqa: BLE001
             reason = (
                 "SHAP_ERROR"
                 if stage == "explain"

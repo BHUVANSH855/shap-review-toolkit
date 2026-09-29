@@ -24,3 +24,41 @@ def test_canonical_distribution_contract():
     assert SCHEMA_VERSION
     assert len(CAPABILITIES) == 24
     assert "evidence" in CAPABILITIES
+
+def test_release_metadata_is_synchronized():
+    import json
+    from pathlib import Path
+
+    from shap_review.version import SCHEMA_VERSION, VERSION
+
+    root = Path(__file__).parents[1]
+    assert VERSION and SCHEMA_VERSION
+    assert f'version = "{VERSION}"' in (root / "pyproject.toml").read_text()
+    plugin = json.loads(
+        (root / "plugins/shap-review-toolkit/.claude-plugin/plugin.json").read_text()
+    )
+    assert plugin["version"] == VERSION
+    assert "fuzz-protocol" in plugin["commands"]
+
+
+def test_cli_reports_canonical_metadata():
+    from shap_review.cli import dispatch
+    from shap_review.version import SCHEMA_VERSION, VERSION
+
+    assert dispatch("version")["version"] == VERSION
+    assert dispatch("capabilities")["schema_version"] == SCHEMA_VERSION
+    assert dispatch("evidence")["supported"] is True
+
+
+def test_cli_capability_contract_exposes_current_commands():
+    from shap_review.cli import dispatch
+
+    result = dispatch("capabilities")
+    assert "fuzz-protocol" in result["commands"]
+    assert "semantic-oracle" in result["commands"]
+
+
+
+
+
+
