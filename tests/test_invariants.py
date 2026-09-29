@@ -143,3 +143,99 @@ def test_public_package_version_matches_development_metadata():
     from shap_review.version import VERSION
 
     assert shap_review.__version__ == VERSION
+
+
+def test_canonical_capability_contract():
+    from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
+
+    assert VERSION
+    assert SCHEMA_VERSION
+    assert len(CAPABILITIES) == 24
+    assert "evidence" in CAPABILITIES
+    assert list(CAPABILITIES) == list(dict.fromkeys(CAPABILITIES))
+
+
+def test_shap_contract_validation():
+    from shap_review.contracts import (
+        SHAPContract,
+        compare_contracts,
+        validate_contract,
+    )
+
+    first = SHAPContract(
+        "TreeExplainer",
+        "tree",
+        values_shape=(2, 3),
+    )
+    second = SHAPContract(
+        "TreeExplainer",
+        "tree",
+        values_shape=(2, 3),
+    )
+
+    assert compare_contracts(first, second)["equal"]
+
+    result = validate_contract(
+        first,
+        [[1, 2, 3], [4, 5, 6]],
+    )
+
+    assert result["values_shape_match"]
+
+def test_evidence_graph_rejects_shared_ancestry_as_independent():
+    from shap_review.evidence.chain import build_chain
+
+    chain = build_chain(
+        entries=[
+            {
+                "kind": "historical",
+                "source": "issue",
+                "claim": "known",
+                "passed": True,
+                "evidence_id": "root",
+            },
+            {
+                "kind": "static",
+                "source": "rule-a",
+                "claim": "hit",
+                "passed": True,
+                "evidence_id": "a",
+                "derived_from": ["root"],
+            },
+            {
+                "kind": "dynamic",
+                "source": "rule-b",
+                "claim": "hit",
+                "passed": True,
+                "evidence_id": "b",
+                "derived_from": ["root"],
+            },
+        ]
+    )
+
+    assert not chain.graph.is_independent("a", "b")
+
+
+def test_semantic_contract_executes_additivity_oracle():
+    import numpy as np
+
+    from shap_review.contracts import SHAPContract, validate_contract
+
+    contract = SHAPContract(
+        "TreeExplainer",
+        "tree",
+        values_shape=(2, 3),
+        base_values_shape=(2,),
+        target_shape=(2,),
+        tolerance=1e-6,
+    )
+
+    result = validate_contract(
+        contract,
+        np.ones((2, 3)),
+        np.zeros(2),
+        np.full(2, 3.0),
+    )
+
+    assert result["valid"]
+    assert result["semantic_oracle"]["passed"]

@@ -341,9 +341,14 @@ def test_runtime_bridge_preserves_environment_provenance():
         assert provenance["seed"] == 42
         assert provenance["iterations"] == 0
 
+
 def test_evidence_graph_preserves_item_provenance():
     from shap_review.evidence.graph import EvidenceGraph
-    from shap_review.evidence.model import EvidenceItem, EvidenceKind, EvidenceOrigin
+    from shap_review.evidence.model import (
+        EvidenceItem,
+        EvidenceKind,
+        EvidenceOrigin,
+    )
 
     item = EvidenceItem(
         EvidenceKind.DYNAMIC,
@@ -414,6 +419,7 @@ def test_evidence_graph_detects_shared_ancestry():
     assert not graph.is_independent("left", "right")
     assert graph.independence_reason("left", "right") == "shared-ancestry"
 
+
 def test_evidence_verdict_stays_static_when_runtime_provenance_is_ambiguous():
     from shap_review.evidence.model import EvidenceChain, EvidenceItem, EvidenceKind
 
@@ -452,3 +458,74 @@ def test_evidence_verdict_stays_static_when_runtime_provenance_is_ambiguous():
     )
 
     assert chain.verdict() == "STATIC_CANDIDATE"
+
+
+def test_evidence_dependency_is_not_independent():
+    from shap_review.evidence import (
+        EvidenceChain,
+        EvidenceItem,
+        EvidenceKind,
+        EvidenceOrigin,
+    )
+
+    chain = EvidenceChain()
+    chain.add(
+        EvidenceItem(
+            EvidenceKind.STATIC,
+            "historical-rule",
+            "same issue",
+            True,
+            origin=EvidenceOrigin.DERIVED,
+            derived_from=("SHAP-EVID-1",),
+        )
+    )
+
+    assert chain.independent_items() == []
+    assert chain.verdict() == "UNVALIDATED"
+
+
+def test_evidence_gate_rejects_static_confirmation():
+    from shap_review.evidence import EvidenceChain, EvidenceItem, EvidenceKind
+    from shap_review.findings.lifecycle import evidence_transition
+    from shap_review.types import FindingStatus
+
+    chain = EvidenceChain(
+        [EvidenceItem(EvidenceKind.STATIC, "x", "candidate", True)]
+    )
+
+    try:
+        evidence_transition(
+            FindingStatus.REPRODUCED,
+            FindingStatus.EVIDENCE_VALID,
+            chain,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("static evidence must not pass confirmation gate")
+
+def test_promotion_requires_runtime_evidence():
+    import pytest
+
+    from shap_review.evidence.chain import build_chain
+    from shap_review.findings.lifecycle import evidence_transition
+    from shap_review.types import FindingStatus
+
+    chain = build_chain(
+        entries=[
+            {
+                "kind": "static",
+                "source": "s",
+                "claim": "candidate",
+                "passed": True,
+                "evidence_id": "s",
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError):
+        evidence_transition(
+            FindingStatus.REPRO_PENDING,
+            FindingStatus.REPRODUCED,
+            chain,
+        )

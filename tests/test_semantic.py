@@ -323,3 +323,76 @@ void f(PyObject* x) {
     result = correlate_boundary(path, 3)
 
     assert result["lifetime_after_boundary"] is True
+
+def test_native_flow_associates_symbol(tmp_path: Path):
+    from shap_review.semantic.native_flow import correlate_boundary
+
+    path = tmp_path / "x.cpp"
+    path.write_text(
+        """
+void f(PyObject* x) {
+    auto data = PyArray_DATA(x);
+    if (!data) { return; }
+    Py_DECREF(x);
+    free(data);
+}
+"""
+    )
+
+    result = correlate_boundary(path, 3)
+
+    assert result["same_function"]
+    assert result["symbol"] == "data"
+    assert result["lifetime_after_boundary"]
+
+
+def test_native_flow_marks_heuristic_results_as_not_proven(tmp_path: Path):
+    from shap_review.semantic.native_flow import correlate_boundary
+
+    source = """void f(PyObject* x) {
+    auto data = PyArray_DATA(x);
+    if (!data) { return; }
+    Py_DECREF(data);
+}
+"""
+
+    path = tmp_path / "native.cpp"
+    path.write_text(source, encoding="utf-8")
+
+    result = correlate_boundary(path, boundary_line=2)
+
+    assert result["analysis_mode"] == "triage"
+    assert result["proof_status"] == "NOT_PROVEN"
+    assert result["requires_runtime_or_control_flow_validation"] is True
+    assert result["lifetime_after_boundary"] is True
+
+def test_api_era_scanner():
+    from shap_review.semantic.api_era import scan_api_era
+
+    findings = scan_api_era(
+        "explainer.shap_values(X)\n"
+        "shap.Explainer(model)(X)"
+    )
+
+    assert any(finding["era"] == "legacy" for finding in findings)
+    assert any(
+        finding["api"] == "Explainer.__call__"
+        for finding in findings
+    )
+
+
+def test_native_map_has_expected_layers(tmp_path: Path):
+    from shap_review.native import map_shap_native
+
+    (tmp_path / "shap/cutils").mkdir(parents=True)
+    (tmp_path / "shap/cext").mkdir(parents=True)
+
+    result = map_shap_native(str(tmp_path))
+
+    names = {
+        component["name"]
+        for component in result["components"]
+        if component["present"]
+    }
+
+    assert {"cutils", "cext"} <= names

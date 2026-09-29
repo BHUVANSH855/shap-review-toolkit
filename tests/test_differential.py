@@ -120,3 +120,36 @@ def test_differential_requires_semantic_contract():
     result = compare_shap_contract(left, right)
 
     assert result["equal"] is True
+
+def test_differential_marks_metadata_separately():
+    from shap_review.differential.semantic import compare_shap_contract
+
+    first = {"values": [[1.0]], "feature_names": ["a"]}
+    second = {"values": [[1.0]], "feature_names": ["b"]}
+
+    result = compare_shap_contract(first, second)
+
+    assert result["semantic_equal"]
+    assert result["fields"]["feature_names"]["severity"] == "metadata"
+
+
+def test_cpu_gpu_script_differential_reports_semantic_fields(tmp_path):
+    from shap_review.differential.gpu_runner import cpu_gpu_scripts
+
+    cpu = tmp_path / "cpu.py"
+    gpu = tmp_path / "gpu.py"
+
+    cpu.write_text(
+        "import json; "
+        "print(json.dumps({'values': [[1.0]], 'base_values': [0.0]}))\n"
+    )
+    gpu.write_text(
+        "import json; "
+        "print(json.dumps({'values': [[1.0]], "
+        "'base_values': [0.0], 'feature_names':['x']}))\n"
+    )
+
+    result = cpu_gpu_scripts(cpu, gpu)
+
+    assert result["applicable"]
+    assert result["semantic_equal"]

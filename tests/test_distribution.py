@@ -15,3 +15,12 @@ def test_distribution_hygiene_script():
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_canonical_distribution_contract():
+    from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
+
+    assert VERSION
+    assert SCHEMA_VERSION
+    assert len(CAPABILITIES) == 24
+    assert "evidence" in CAPABILITIES

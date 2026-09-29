@@ -217,3 +217,25 @@ def test_protocol_campaign_executes_protocols():
     assert result["executed"] == 20
     assert result["protocols_observed"]
     assert result["mutation_observed"] >= 0
+
+def test_protocol_every_declared_protocol_is_triggerable():
+    from shap_review.fuzzing.generators.protocol import PROTOCOLS
+    from shap_review.fuzzing.protocol_campaign import ProtocolCampaign
+
+    campaign = ProtocolCampaign(1)
+    result = campaign.run(iterations=len(PROTOCOLS) * 3)
+
+    assert result["coverage_percent"] == 100.0
+    assert all(result["protocol_coverage"].values())
+
+
+def test_backend_matrix_has_primary_tree_backends():
+    from shap_review.fuzzing.backend_matrix import (
+        DEFAULT_BACKENDS,
+        matrix_dimensions,
+    )
+
+    names = {backend.name for backend in DEFAULT_BACKENDS}
+
+    assert {"sklearn", "xgboost", "lightgbm", "catboost"} <= names
+    assert "backend" in matrix_dimensions()
