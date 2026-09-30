@@ -153,9 +153,7 @@ def differential_scripts(
         left["value"], right["value"], rtol=rtol, atol=atol
     )
 
-    agree = bool(
-        out["comparison"]["equal"] and out["contract_comparison"]["equal"]
-    )
+    agree = bool(out["comparison"]["equal"] and out["contract_comparison"]["equal"])
 
     out.update(
         {

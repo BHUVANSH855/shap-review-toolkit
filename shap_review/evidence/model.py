@@ -32,6 +32,22 @@ KIND_WEIGHT = {
     EvidenceKind.SANITIZER: 2.5,
 }
 
+# Evidence kinds that require execution provenance before they can participate
+# in scoring. This is intentionally stricter than simply checking ``passed``.
+_EXECUTION_KINDS = frozenset(
+    {
+        EvidenceKind.DYNAMIC,
+        EvidenceKind.DIFFERENTIAL,
+        EvidenceKind.REPRODUCTION,
+        EvidenceKind.SANITIZER,
+    }
+)
+
+
+def _clamp_confidence(value: float) -> float:
+    """Clamp confidence to the closed [0, 1] interval."""
+    return max(0.0, min(1.0, float(value)))
+
 
 @dataclass(frozen=True)
 class EvidenceItem:
@@ -54,7 +70,30 @@ class EvidenceItem:
     transformation: str | None = None
 
     @property
+    def normalized_confidence(self) -> float:
+        """Return confidence constrained to the scoring range."""
+        return _clamp_confidence(self.confidence)
+
+    @property
+    def has_execution_provenance(self) -> bool:
+        """Return whether execution evidence has enough provenance to score."""
+        return bool(
+            self.execution_id
+            and (
+                self.fixture_id
+                or self.input_fingerprint
+                or self.repository_revision
+                or self.environment_fingerprint
+            )
+        )
+
+    @property
     def intrinsically_valid(self) -> bool:
+        """Return whether the item is structurally valid on its own.
+
+        Derived evidence is deliberately excluded from intrinsic independence.
+        Pairwise independence remains the responsibility of ``EvidenceGraph``.
+        """
         if (
             self.derived_from
             or self.parent_evidence_ids
@@ -62,51 +101,35 @@ class EvidenceItem:
         ):
             return False
 
-        if self.kind in {
-            EvidenceKind.DYNAMIC,
-            EvidenceKind.REPRODUCTION,
-            EvidenceKind.DIFFERENTIAL,
-            EvidenceKind.SANITIZER,
-        }:
-            return bool(
-                self.execution_id
-                and (
-                    self.fixture_id
-                    or self.input_fingerprint
-                    or self.repository_revision
-                    or self.environment_fingerprint
-                )
-            )
+        if self.kind in _EXECUTION_KINDS:
+            return self.has_execution_provenance
 
         return True
 
     @property
     def independent(self) -> bool:
-        """Item-level structural independence check.
+        """Return intrinsic validity, not pairwise graph independence.
 
-        Returns ``True`` only when this item is ``intrinsically_valid``.
-
-        **This is NOT pairwise independence.**  Two items that are both
-        ``intrinsically_valid`` may still be correlated (shared execution_id,
-        fixture_id, etc.).  Pairwise independence is determined by
-        ``EvidenceGraph`` and is only accessible through
-        ``EvidenceChain.independent_items()`` when a graph is attached via
-        ``build_chain()``.  Always use ``build_chain()`` to construct chains.
+        Two intrinsically valid items may still be correlated. Pairwise
+        independence is determined by ``EvidenceGraph``.
         """
         return self.intrinsically_valid
 
-    def to_dict(self):
-        d = asdict(self)
-        d["kind"] = self.kind.value
-        d["origin"] = self.origin.value
-        d["intrinsically_valid"] = self.intrinsically_valid
-        d["independence_scope"] = "graph-derived-pairwise"
-        d["independent"] = self.independent
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["kind"] = self.kind.value
+        data["origin"] = self.origin.value
+        data["confidence"] = self.normalized_confidence
+        data["intrinsically_valid"] = self.intrinsically_valid
+        data["independence_scope"] = "graph-derived-pairwise"
+        data["independent"] = self.independent
+
         validation = validate_evidence_item(self)
-        d["validation_status"] = validation.status
-        d["provenance_valid"] = validation.provenance_valid
-        d["scoring_eligible"] = validation.scoring_eligible
-        return d
+        data["validation_status"] = validation.status
+        data["provenance_valid"] = validation.provenance_valid
+        data["scoring_eligible"] = validation.scoring_eligible
+
+        return data
 
 
 @dataclass
@@ -116,140 +139,248 @@ class EvidenceChain:
 
     def add(self, item: EvidenceItem) -> None:
         validation = validate_evidence_item(item)
+
         if not validation.valid:
             raise ValueError(
                 f"invalid evidence {getattr(item, 'evidence_id', '<unknown>')}: "
                 f"{validation.reason}; missing={validation.missing}"
             )
+
         self.items.append(item)
 
-    def kinds(self):
-        return {i.kind for i in self.items}
+    def kinds(self) -> set[EvidenceKind]:
+        return {item.kind for item in self.items}
 
     @staticmethod
     def _scoring_eligible(item: EvidenceItem) -> bool:
-        """Return whether an item is eligible to participate in scoring."""
+        """Return whether an evidence item may participate in scoring."""
         validation = validate_evidence_item(item)
-        return bool(validation.scoring_eligible and item.intrinsically_valid)
+
+        return bool(
+            validation.scoring_eligible
+            and item.intrinsically_valid
+            and item.confidence > 0
+        )
+
+    def scoring_items(self) -> list[EvidenceItem]:
+        """Return all structurally valid items eligible for scoring."""
+        return [item for item in self.items if self._scoring_eligible(item)]
 
     def independent_items(self) -> list[EvidenceItem]:
-        """Return the subset of items that are pairwise independent.
+        """Return a conservatively selected independent evidence set.
 
-        When a provenance graph is attached (via ``build_chain()``) pairwise
-        independence is determined by ``EvidenceGraph.is_independent()``.
-
-        When no graph is attached **and** there is more than one scoring-
-        eligible item, only the first item is returned.  This conservative
-        fallback prevents inflated confidence scores when the caller has
-        bypassed ``build_chain()``.  Two items that share an execution_id
-        or fixture_id would both be counted without this guard, which can
-        inflate HIGH_CONFIDENCE or CONFIRMED verdicts incorrectly.
-
-        Always use ``build_chain()`` to construct evidence chains so that
-        pairwise correlation is correctly detected.
+        With a provenance graph attached, pairwise independence is established
+        by ``EvidenceGraph``. Without a graph, only one scoring-eligible item
+        is admitted. This prevents callers that bypass ``build_chain()`` from
+        accidentally converting correlated evidence into confidence.
         """
-        eligible = [item for item in self.items if self._scoring_eligible(item)]
+        eligible = self.scoring_items()
 
         if self.graph is None:
-            # Conservative fallback: return at most one item to prevent
-            # false-confidence inflation from undetected correlations.
             return eligible[:1]
 
         selected: list[EvidenceItem] = []
-        for item in eligible:
+
+        # Stable ordering makes scoring deterministic rather than dependent on
+        # whichever producer happened to insert evidence first.
+        ordered = sorted(
+            eligible,
+            key=lambda item: (
+                -KIND_WEIGHT[item.kind],
+                -item.normalized_confidence,
+                item.evidence_id,
+            ),
+        )
+
+        for item in ordered:
             if item.evidence_id not in self.graph.nodes:
                 continue
 
             if all(
-                self.graph.is_independent(item.evidence_id, other.evidence_id)
+                self.graph.is_independent(
+                    item.evidence_id,
+                    other.evidence_id,
+                )
                 for other in selected
             ):
                 selected.append(item)
 
         return selected
 
-    def independent_kinds(self):
-        return len({i.kind for i in self.independent_items()})
+    def independent_kinds(self) -> int:
+        return len({item.kind for item in self.independent_items()})
 
-    def strongest_positive(self):
+    def strongest_positive(self) -> float:
         return max(
             (
-                KIND_WEIGHT[i.kind] * max(0, min(1, i.confidence))
-                for i in self.independent_items()
-                if i.passed is True
+                KIND_WEIGHT[item.kind] * item.normalized_confidence
+                for item in self.independent_items()
+                if item.passed is True
             ),
             default=0.0,
         )
 
-    def evidence_strength_score(self):
-        pos = sum(
-            KIND_WEIGHT[i.kind] * max(0, min(1, i.confidence))
-            for i in self.independent_items()
-            if i.passed is True
+    def positive_score(self) -> float:
+        """Return the weighted score contributed by positive evidence."""
+        return sum(
+            KIND_WEIGHT[item.kind] * item.normalized_confidence
+            for item in self.independent_items()
+            if item.passed is True
         )
-        neg = sum(
-            KIND_WEIGHT[i.kind] * max(0, min(1, i.confidence))
-            for i in self.independent_items()
-            if i.passed is False
-        )
-        return max(0.0, pos - neg * 0.75)
 
-    def score(self):
-        """Backward-compatible alias for the heuristic evidence-strength score."""
+    def negative_score(self) -> float:
+        """Return the weighted score contributed by negative evidence."""
+        return sum(
+            KIND_WEIGHT[item.kind] * item.normalized_confidence
+            for item in self.independent_items()
+            if item.passed is False
+        )
+
+    def inconclusive_items(self) -> list[EvidenceItem]:
+        """Return evidence that neither confirms nor refutes the claim."""
+        return [item for item in self.independent_items() if item.passed is None]
+
+    def evidence_strength_score(self) -> float:
+        """Return a heuristic net evidence score.
+
+        This score is intentionally not a probability. Negative evidence is
+        discounted rather than treated as a symmetric inverse of positive
+        evidence because a failed validation can have several explanations.
+        """
+        return max(
+            0.0,
+            self.positive_score() - self.negative_score() * 0.75,
+        )
+
+    def score(self) -> float:
+        """Backward-compatible alias for ``evidence_strength_score``."""
         return self.evidence_strength_score()
 
-    def verdict(self):
+    def _sanitizer_finding(self, items: list[EvidenceItem]) -> bool:
+        return any(
+            item.kind == EvidenceKind.SANITIZER
+            and item.passed is True
+            and item.details.get("finding", True) is True
+            for item in items
+        )
+
+    def _sanitizer_clean(self, items: list[EvidenceItem]) -> bool:
+        return any(
+            item.kind == EvidenceKind.SANITIZER
+            and item.passed is True
+            and item.details.get("finding") is False
+            for item in items
+        )
+
+    def _has_confirming_reproduction(self, items: list[EvidenceItem]) -> bool:
+        """Return whether a reproduction provides explicit positive confirmation."""
+        return any(
+            item.kind == EvidenceKind.REPRODUCTION
+            and item.passed is True
+            and bool(
+                item.details.get("reproduced")
+                or item.details.get("confirmed")
+                or item.details.get("failure_observed")
+            )
+            for item in items
+        )
+
+    def _has_validated_dynamic(self, items: list[EvidenceItem]) -> bool:
+        return any(
+            item.kind == EvidenceKind.DYNAMIC and item.passed is True for item in items
+        )
+
+    def _has_validated_differential(self, items: list[EvidenceItem]) -> bool:
+        return any(
+            item.kind == EvidenceKind.DIFFERENTIAL and item.passed is True
+            for item in items
+        )
+
+    def verdict(self) -> str:
+        """Classify the current evidence conservatively.
+
+        Verdicts describe the strength of available evidence; they are not
+        probabilities and do not establish that a bug exists without the
+        underlying evidence being independently reviewed.
+        """
         items = self.independent_items()
-        kinds = {i.kind for i in items}
+        kinds = {item.kind for item in items}
         score = self.evidence_strength_score()
-        sanitizer_findings = [
-            i
-            for i in items
-            if i.kind == EvidenceKind.SANITIZER
-            and i.passed is True
-            and i.details.get("finding", True)
-        ]
-        sanitizer_clean = [
-            i
-            for i in items
-            if i.kind == EvidenceKind.SANITIZER
-            and i.passed is True
-            and i.details.get("finding") is False
-        ]
-        if sanitizer_findings:
+
+        if not items:
+            return "UNVALIDATED"
+
+        if self._sanitizer_finding(items):
             return "SANITIZER_FINDING"
-        if sanitizer_clean:
+
+        # A clean sanitizer run is informative but must not erase a positive
+        # reproduction or dynamic finding.
+        if self._sanitizer_clean(items):
+            if self._has_confirming_reproduction(items) or self._has_validated_dynamic(
+                items
+            ):
+                return "CONTRADICTORY_EVIDENCE"
             return "SANITIZER_CLEAN"
+
+        # Confirmation requires an explicitly successful reproduction and
+        # independent dynamic evidence. Mere presence of both kinds is not
+        # sufficient.
         if (
-            EvidenceKind.REPRODUCTION in kinds
-            and EvidenceKind.DYNAMIC in kinds
+            self._has_confirming_reproduction(items)
+            and self._has_validated_dynamic(items)
             and score >= 3.0
         ):
             return "CONFIRMED"
-        if EvidenceKind.DIFFERENTIAL in kinds and score >= 3.0:
+
+        # Differential evidence is strong corroboration, but it does not by
+        # itself establish a bug. Require an actual positive differential
+        # observation and enough net evidence.
+        if (
+            self._has_validated_differential(items)
+            and score >= 3.0
+            and (EvidenceKind.REPRODUCTION in kinds or EvidenceKind.DYNAMIC in kinds)
+        ):
             return "HIGH_CONFIDENCE"
-        if EvidenceKind.DYNAMIC in kinds and score >= 2.0:
+
+        if self._has_validated_dynamic(items) and score >= 2.0:
             return "DYNAMICALLY_VALIDATED"
-        if EvidenceKind.HISTORICAL in kinds and EvidenceKind.STATIC in kinds:
+
+        if (
+            EvidenceKind.HISTORICAL in kinds
+            and EvidenceKind.STATIC in kinds
+            and score > 0
+        ):
             return "HISTORICALLY_CORRELATED"
+
         if EvidenceKind.STATIC in kinds:
             return "STATIC_CANDIDATE"
+
         return "UNVALIDATED"
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the chain with its effective scoring state."""
+        score = self.evidence_strength_score()
+        independent = self.independent_items()
+
         return {
             "verdict": self.verdict(),
-            "evidence_strength_score": round(self.evidence_strength_score(), 3),
-            "score": round(self.evidence_strength_score(), 3),
-            "independent_evidence_kinds": self.independent_kinds(),
+            "evidence_strength_score": round(score, 3),
+            "score": round(score, 3),
+            "positive_score": round(self.positive_score(), 3),
+            "negative_score": round(self.negative_score(), 3),
+            "independent_evidence_kinds": len({item.kind for item in independent}),
+            "independent_evidence_count": len(independent),
+            "inconclusive_evidence_count": len(
+                [item for item in independent if item.passed is None]
+            ),
             "graph_attached": self.graph is not None,
-            "items": [i.to_dict() for i in self.items],
+            "items": [item.to_dict() for item in self.items],
             "independence_policy": (
                 "Pairwise independence is graph-derived; execution, "
                 "fixture/input lineage, revision/environment, ancestry and "
-                "transformations are considered. "
-                "When no graph is attached only a single item participates "
-                "in scoring (conservative fallback). Always use build_chain()."
+                "transformations are considered. When no graph is attached "
+                "only a single item participates in scoring. Always use "
+                "build_chain()."
             ),
             "score_semantics": (
                 "Heuristic evidence-strength score for prioritization, not probability."

@@ -36,23 +36,27 @@ def run_4911():
         except Exception as exc:  # noqa: BLE001
             exc_type = type(exc).__name__
             exc_msg = str(exc).lower()
-            # Only mark as reproduced when the exception is clearly caused by the
-            # nullable dtype / object-dtype reaching native processing — not by
-            # an unrelated error (e.g. wrong background shape, MemoryError).
-            nullable_keywords = {
-                "int64",
-                "nullable",
-                "object",
-                "cannot convert",
-                "unsupported dtype",
-                "invalid dtype",
-                "float conversion",
-                "expected float",
-                "buffer",
-            }
-            is_nullable_error = exc_type in ("TypeError", "ValueError") and any(
-                kw in exc_msg for kw in nullable_keywords
+            # Mark the historical regression as reproduced only when the
+            # exception matches the source-grounded nullable-dtype failure:
+            # pandas nullable Int64 data reaches SHAP's native TreeExplainer
+            # path as object dtype and cannot be cast to float64.
+            nullable_dtype_markers = (
+                "cannot cast array data from dtype('o') to dtype('float64')",
+                "cannot cast array data from dtype('object') to dtype('float64')",
             )
+            nullable_context_markers = (
+                "nullable",
+                "dtype('o')",
+                "dtype('object')",
+                "float64",
+            )
+
+            is_nullable_error = (
+                exc_type == "TypeError"
+                and any(marker in exc_msg for marker in nullable_dtype_markers)
+                and all(marker in exc_msg for marker in nullable_context_markers)
+            )
+
             if is_nullable_error:
                 status = "reproduced"
             else:

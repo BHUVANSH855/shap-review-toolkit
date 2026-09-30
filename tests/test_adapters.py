@@ -278,8 +278,9 @@ def test_script_execution_commands_log_warning(caplog):
 
     adapter = ClaudeAdapter()
     # Patch dispatch so we don't need a real script file.
-    with patch("adapters.base.dispatch", return_value={"status": "ok"}), caplog.at_level(
-        logging.WARNING, logger="adapters.base"
+    with (
+        patch("adapters.base.dispatch", return_value={"status": "ok"}),
+        caplog.at_level(logging.WARNING, logger="adapters.base"),
     ):
         adapter.invoke("reproduce", {"root": ".", "script": "x.py"})
     assert any(

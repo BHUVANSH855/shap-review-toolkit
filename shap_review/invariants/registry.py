@@ -36,9 +36,7 @@ class Invariant:
         cannot silently downgrade an invariant to a manual/static check.
         """
         if self.oracle_name not in ORACLE_MAP:
-            raise ValueError(
-                f"Unknown invariant oracle: {self.oracle_name!r}"
-            )
+            raise ValueError(f"Unknown invariant oracle: {self.oracle_name!r}")
 
         qualified = ORACLE_MAP[self.oracle_name]
         if qualified is None:
@@ -73,14 +71,10 @@ class InvariantRegistry:
             try:
                 inv = Invariant(**raw)
             except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"Invalid invariant definition in {p}: {exc}"
-                ) from exc
+                raise ValueError(f"Invalid invariant definition in {p}: {exc}") from exc
 
             if inv.id in out:
-                raise ValueError(
-                    f"Duplicate invariant id {inv.id!r} in {p}"
-                )
+                raise ValueError(f"Duplicate invariant id {inv.id!r} in {p}")
 
             out[inv.id] = inv
         return out

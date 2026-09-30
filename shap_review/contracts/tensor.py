@@ -48,9 +48,7 @@ class SHAPAxisSpec:
             if output is not None and output in pair:
                 raise ValueError("interaction feature axes cannot include output_axis")
             if class_axis is not None and class_axis in pair:
-                raise ValueError(
-                    "class_axis cannot overlap interaction feature axes"
-                )
+                raise ValueError("class_axis cannot overlap interaction feature axes")
 
         if class_axis is not None:
             if class_axis in {sample, feature}:
@@ -318,10 +316,27 @@ def semantic_align(
             },
         )
     if a.ndim != b.ndim:
-        # A single-sample target is commonly represented as (outputs,) while the
-        # reconstructed SHAP tensor is (1, outputs). This is the only non-scalar
-        # rank reduction authorized here: the omitted axis must be a singleton
-        # sample axis. No arbitrary rank promotion is allowed.
+        # A single-sample representation may omit the sample axis, but this
+        # normalization is only valid for roles that authorize sample-axis
+        # alignment. In particular, contribution tensors must retain their
+        # explicit semantic structure and must not gain rank implicitly.
+        sample_axis_roles = {
+            "target",
+            "model_output",
+            "base_values",
+            "expected_value",
+        }
+
+        if role not in sample_axis_roles:
+            raise ValueError(
+                f"role {role!r} does not authorize sample-axis rank alignment: "
+                f"{a.shape} vs {b.shape}"
+            )
+
+        # A single-sample target is commonly represented as (outputs,) while
+        # the reconstructed SHAP tensor is (1, outputs). This is the only
+        # non-scalar rank reduction authorized here: the omitted axis must be
+        # the singleton sample axis. No arbitrary rank promotion is allowed.
         if (
             a.ndim == b.ndim + 1
             and a.shape[0] == 1
@@ -341,6 +356,7 @@ def semantic_align(
                     "role": role,
                 },
             )
+
         if (
             b.ndim == a.ndim + 1
             and b.shape[0] == 1
@@ -360,6 +376,7 @@ def semantic_align(
                     "role": role,
                 },
             )
+
         raise ValueError(
             f"rank mismatch is not contract-authorized: {a.shape} vs {b.shape}"
         )
@@ -465,8 +482,7 @@ def infer_axis_spec(
             )
 
         raise ValueError(
-            f"unsupported canonical interaction tensor rank: {ndim}; "
-            "provide axis_spec"
+            f"unsupported canonical interaction tensor rank: {ndim}; provide axis_spec"
         )
 
     if ndim == 3:

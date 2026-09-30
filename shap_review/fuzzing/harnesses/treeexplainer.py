@@ -135,9 +135,7 @@ def run_case(case: dict) -> dict:
             interaction_executed = False
             base = np.asarray(explainer.expected_value)
             target = np.asarray(
-                model.predict_proba(sample)
-                if classification
-                else model.predict(sample)
+                model.predict_proba(sample) if classification else model.predict(sample)
             )
 
         if isinstance(values, list):

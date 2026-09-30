@@ -45,11 +45,7 @@ def numeric_additivity(
             atol=atol,
             equal_nan=False,
         )
-        err = (
-            float(np.max(np.abs(reconstructed - rhs)))
-            if reconstructed.size
-            else 0.0
-        )
+        err = float(np.max(np.abs(reconstructed - rhs))) if reconstructed.size else 0.0
 
         return OracleResult(
             bool(ok),

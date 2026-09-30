@@ -27,51 +27,52 @@ class OracleIndependence(str, Enum):
 
 
 def classify_target_provenance(
-    source: str | None, explicit_independent: bool | None = None
+    source: str | None,
+    explicit_independent: bool | None = None,
+    *,
+    independence_proof: str | None = None,
 ) -> dict[str, Any]:
-    """Classify target provenance without equating a separate model call with an independent oracle."""
+    """Classify target provenance conservatively.
+
+    A caller declaration is not sufficient to prove oracle independence.
+    ``PROVEN`` is reserved for targets with explicit, machine-readable proof
+    metadata. ``DECLARED`` records a caller declaration without treating it
+    as proof of independence.
+    """
     raw = (source or "unknown").lower()
+
     if raw in {"model.predict", "model.predict_proba", "model_api"}:
         source_kind = TargetSource.MODEL_API.value
-        independence = (
-            OracleIndependence.PARTIAL.value
-            if explicit_independent is True
-            else OracleIndependence.UNKNOWN.value
-        )
     elif raw in {"independent_probability_fn", "independent_function"}:
         source_kind = TargetSource.INDEPENDENT_FUNCTION.value
-        independence = (
-            OracleIndependence.DECLARED.value
-            if explicit_independent is True
-            else OracleIndependence.PARTIAL.value
-        )
     elif raw in {"supplied_external", "external_reference"}:
         source_kind = TargetSource.EXTERNAL_REFERENCE.value
-        independence = (
-            OracleIndependence.DECLARED.value
-            if explicit_independent is True
-            else OracleIndependence.UNKNOWN.value
-        )
     elif raw in {"user_supplied"}:
         source_kind = TargetSource.USER_SUPPLIED.value
-        independence = OracleIndependence.UNKNOWN.value
     else:
         source_kind = TargetSource.UNKNOWN.value
+
+    proof = (independence_proof or "").strip()
+
+    if proof:
+        independence = OracleIndependence.PROVEN.value
+        independence_basis = "explicit_proof"
+    elif explicit_independent is True:
+        independence = OracleIndependence.DECLARED.value
+        independence_basis = "caller_declared"
+    elif explicit_independent is False:
         independence = OracleIndependence.UNKNOWN.value
-    basis = (
-        "caller_declared"
-        if explicit_independent is True
-        else (
-            "caller_declared_non_independent"
-            if explicit_independent is False
-            else "not_declared"
-        )
-    )
+        independence_basis = "caller_declared_non_independent"
+    else:
+        independence = OracleIndependence.UNKNOWN.value
+        independence_basis = "not_declared"
+
     return {
         "target_source": source_kind,
         "oracle_independence": independence,
         "explicit_independent": explicit_independent,
-        "independence_basis": basis,
+        "independence_basis": independence_basis,
+        "independence_proof": proof or None,
         "proof_required_for": OracleIndependence.PROVEN.value,
     }
 

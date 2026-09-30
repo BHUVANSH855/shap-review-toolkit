@@ -863,6 +863,7 @@ def test_interaction_oracle_asymmetric_same_ndim_is_also_inconclusive():
     assert result.passed is None
     assert result.status == OracleStatus.INCONCLUSIVE
 
+
 def test_axis_spec_rejects_class_axis_overlapping_interaction_axis():
     from shap_review.contracts.tensor import SHAPAxisSpec
 
