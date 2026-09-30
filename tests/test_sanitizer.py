@@ -99,7 +99,8 @@ def test_detect_instrumentation_returns_structured_result():
 
 def test_not_instrumented_verdict_is_not_finding():
     """NOT_INSTRUMENTED runs must never report finding=True."""
-    import tempfile, os
+    import os
+    import tempfile
     with tempfile.NamedTemporaryFile(suffix=".py", mode="w", delete=False) as f:
         f.write('print("AddressSanitizer: heap-use-after-free")')
         name = f.name
