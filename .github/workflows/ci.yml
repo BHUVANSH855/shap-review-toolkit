@@ -1,0 +1,56 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install toolkit (base)
+        run: pip install -e ".[test]"
+
+      - name: Install integration dependencies
+        run: pip install -e ".[integration]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Run tests (excluding slow fuzzing)
+        run: |
+          python -m pytest -q --tb=short \
+            --ignore=tests/test_fuzzing.py \
+            --ignore=tests/test_treeexplainer_dynamic.py
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[test,integration]"
+
+      - name: Fuzzing smoke test (3 iterations)
+        run: |
+          python -m pytest tests/test_fuzzing.py -q --tb=short \
+            -k "test_fuzzer_executes_cases or test_fuzzer_classifies_all_failures"
+        timeout-minutes: 10

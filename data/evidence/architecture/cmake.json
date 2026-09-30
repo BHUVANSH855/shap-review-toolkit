@@ -1,1 +1,0 @@
-{"id":"cmake-native-architecture","url":"https://github.com/shap/shap/blob/master/CMakeLists.txt","supports":["SHAP-06"],"targets":["_cutils","_cext","_cext_gpu"],"technologies":["nanobind","C++","NumPy C API","CUDA"],"notes":"_cutils is free-threaded and stable-ABI configured; _cext is Tree Logic; GPU target is optional"}

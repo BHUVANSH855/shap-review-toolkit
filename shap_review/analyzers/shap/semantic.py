@@ -10,6 +10,48 @@ from shap_review.types import Candidate, EvidenceRef
 from shap_review.utils import iter_source_files, read_text, rel
 
 
+def _has_ast_assertion(source: str) -> bool:
+    """Return True when *source* contains at least one real assertion.
+
+    Checks for AST-level assert statements AND common pytest/numpy assertion
+    calls so that files using pytest.raises, np.testing.assert_*, or
+    unittest assertions are not incorrectly flagged as test-gap candidates.
+    Plain string search for 'assert' fires on comments, docstrings, and
+    variable names such as 'assert_called_once'.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+
+    _ASSERT_CALL_NAMES = {
+        "assert_allclose",
+        "assert_array_equal",
+        "assert_almost_equal",
+        "assert_raises",
+        "assert_warns",
+        "raises",          # pytest.raises
+        "approx",          # used inside assert ... == approx(...)
+    }
+
+    for node in ast.walk(tree):
+        # Bare assert statement
+        if isinstance(node, ast.Assert):
+            return True
+        # Call to a known assertion helper
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = (
+                func.attr
+                if isinstance(func, ast.Attribute)
+                else (func.id if isinstance(func, ast.Name) else None)
+            )
+            if name in _ASSERT_CALL_NAMES:
+                return True
+
+    return False
+
+
 class SHAPSemanticAnalyzer(Analyzer):
     name = "shap-semantic"
 
@@ -151,7 +193,7 @@ class SHAPSemanticAnalyzer(Analyzer):
                 continue
             t = read_text(p)
             text_cache[rel(root, p)] = t
-            if "interaction_values" in t and "assert" not in t:
+            if "interaction_values" in t and not _has_ast_assertion(t):
                 out.append(
                     Candidate(
                         f"SHAP-CAND-GAP-{p.stem}-{t.index('interaction_values')}",

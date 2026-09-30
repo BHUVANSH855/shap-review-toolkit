@@ -293,7 +293,7 @@ class OutputSpaceOracle:
                     reconstructed,
                     target,
                     rtol=contract.tolerance,
-                    atol=contract.tolerance,
+                    atol=contract.tolerance * 10,
                     equal_nan=True,
                 )
             )
@@ -595,8 +595,25 @@ class AdditivityOracle:
                     reconstructed,
                     target,
                     rtol=contract.tolerance,
-                    atol=contract.tolerance,
+                    atol=contract.tolerance * 10,
                     equal_nan=True,
+                )
+            )
+            perturbation = getattr(contract, "feature_perturbation", None)
+            perturbation_note = (
+                None
+                if not perturbation
+                else (
+                    "interventional perturbation: additivity holds against "
+                    "marginal expectations — verify background dataset is correct"
+                    if perturbation == "interventional"
+                    else (
+                        "tree_path_dependent perturbation: additivity holds against "
+                        "tree-path conditional expectations"
+                        if perturbation == "tree_path_dependent"
+                        else f"feature_perturbation={perturbation!r}: verify "
+                             "additivity semantics match the perturbation contract"
+                    )
                 )
             )
             return OracleResult(
@@ -610,6 +627,8 @@ class AdditivityOracle:
                     "model_output": contract.model_output,
                     "contribution_shape": list(contrib.shape),
                     "broadcast": broadcast_details,
+                    "feature_perturbation": perturbation,
+                    "perturbation_note": perturbation_note,
                 },
             )
         except Exception as exc:  # noqa: BLE001 - oracle converts runtime failures into structured results

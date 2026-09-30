@@ -9,3 +9,5 @@ build/
 .fuzz-work/
 **/.out/
 ruff-errors.txt
+catboost_info/
+**/catboost_info/

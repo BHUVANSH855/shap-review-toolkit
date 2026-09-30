@@ -133,31 +133,72 @@ def run_4495():
 
 
 def run_5098():
-    # The issue's exact reproducer depends on an internal TreeEnsemble path introduced
-    # on main. We preserve the source-grounded precondition and validate the invariant
-    # statically when the local SHAP build does not expose that path.
-    try:
-        import shap
-        from shap.explainers import _tree
+    """Runtime reproducer for SHAP issue #5098.
 
-        has_tree_ensemble = hasattr(_tree, "TreeEnsemble")
+    Executes the standalone reproducer script via subprocess so the result
+    is isolated and the environment is captured. Falls back to a static
+    precondition check when TreeEnsemble is not available on the installed
+    SHAP version.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    script = (
+        _Path(__file__).parents[2] / "data" / "regressions" / "SHAP-5098" / "reproduce.py"
+    )
+
+    if not script.exists():
         return RegressionResult(
             "SHAP-5098",
-            "static_precondition",
+            RegressionStatus.BLOCKED.value,
             False,
             "pre-built TreeEnsemble must propagate requested model_output",
-            "TreeEnsemble API available; exact issue path is version-dependent",
+            "reproducer script not found",
+            {"script": str(script)},
+        )
+
+    try:
+        import shap as _shap
+
+        from shap_review.reproduction.runner import run_script
+
+        run_result = run_script(str(script), timeout=60)
+        stdout = run_result.get("stdout", "")
+
+        try:
+            payload = _json.loads(stdout)
+        except _json.JSONDecodeError:
+            return RegressionResult(
+                "SHAP-5098",
+                RegressionStatus.BLOCKED.value,
+                False,
+                "pre-built TreeEnsemble must propagate requested model_output",
+                f"reproducer output was not valid JSON: {stdout[:200]}",
+                {"shap_version": _shap.__version__, "returncode": run_result.get("returncode")},
+            )
+
+        status = payload.get("status", "blocked")
+        reproduced = bool(payload.get("reproduced", False))
+
+        return RegressionResult(
+            "SHAP-5098",
+            status,
+            reproduced,
+            "pre-built TreeEnsemble must propagate requested model_output",
+            payload.get("note", status),
             {
-                "shap_version": shap.__version__,
-                "tree_ensemble_available": has_tree_ensemble,
+                "shap_version": _shap.__version__,
+                "environment": payload.get("environment", {}),
+                "explainer_model_output": payload.get("explainer_model_output"),
+                "model_model_output": payload.get("model_model_output"),
             },
         )
     except Exception as exc:  # noqa: BLE001
         return RegressionResult(
             "SHAP-5098",
-            "blocked",
+            RegressionStatus.BLOCKED.value,
             False,
-            "static precondition",
+            "pre-built TreeEnsemble must propagate requested model_output",
             "setup failed",
             {"exception": type(exc).__name__, "message": str(exc)},
         )
@@ -220,8 +261,231 @@ def run_catboost_interventional():
         )
 
 
+def run_1539():
+    """Regression for SHAP issue #1539 — deep tree path causes incorrect SHAP values.
+
+    Validates that TreeExplainer produces finite, additivity-satisfying outputs
+    on deep trees (depth >= 8) which historically triggered incorrect node
+    traversal on some SHAP versions.
+    """
+    try:
+        import numpy as np
+        import shap
+        from sklearn.ensemble import RandomForestRegressor
+
+        rng = np.random.default_rng(1539)
+        X = rng.normal(size=(100, 5)).astype(np.float64)
+        y = X.sum(axis=1)
+        model = RandomForestRegressor(
+            n_estimators=5, max_depth=10, random_state=1539
+        ).fit(X, y)
+        explainer = shap.TreeExplainer(model, data=X[:10])
+        values = np.asarray(explainer.shap_values(X[10:20]))
+        base = np.asarray(explainer.expected_value)
+        prediction = np.asarray(model.predict(X[10:20]))
+        reconstructed = values.sum(axis=1) + base
+        finite_ok = bool(np.isfinite(values).all())
+        additivity_ok = bool(np.allclose(reconstructed, prediction, atol=1e-4))
+        reproduced = not finite_ok or not additivity_ok
+        return RegressionResult(
+            "SHAP-1539",
+            "reproduced" if reproduced else "not_reproduced",
+            reproduced,
+            "deep tree must produce finite additivity-satisfying SHAP values",
+            (
+                f"finite={finite_ok}, additivity={additivity_ok}, "
+                f"max_error={float(np.max(np.abs(reconstructed - prediction))):.2e}"
+            ),
+            {
+                "shap_version": shap.__version__,
+                "finite": finite_ok,
+                "additivity_ok": additivity_ok,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        return RegressionResult(
+            "SHAP-1539",
+            RegressionStatus.BLOCKED.value,
+            False,
+            "deep tree finite additivity check",
+            "setup failed",
+            {"exception": type(exc).__name__, "message": str(exc)},
+        )
+
+
+def run_2778():
+    """Regression for SHAP issue #2778 — multi-output TreeExplainer shape contract.
+
+    Validates that shap_values() on a multi-output regression model returns
+    a list/array with the correct shape per output.
+    """
+    try:
+        import numpy as np
+        import shap
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.multioutput import MultiOutputRegressor
+
+        rng = np.random.default_rng(2778)
+        X = rng.normal(size=(80, 4)).astype(np.float64)
+        y = np.column_stack([X.sum(axis=1), X[:, 0] - X[:, 1]])
+        model = MultiOutputRegressor(
+            RandomForestRegressor(n_estimators=3, max_depth=3, random_state=2778)
+        ).fit(X, y)
+        explainer = shap.TreeExplainer(model)
+        values = explainer.shap_values(X[:5])
+        # For multi-output, values should be a list of arrays or a 3D array.
+        if isinstance(values, list):
+            shape_ok = all(np.asarray(v).shape == (5, 4) for v in values)
+            n_outputs = len(values)
+        else:
+            arr = np.asarray(values)
+            shape_ok = arr.ndim == 3 and arr.shape[0] == 5 and arr.shape[1] == 4
+            n_outputs = arr.shape[2] if arr.ndim == 3 else 0
+        reproduced = not shape_ok
+        return RegressionResult(
+            "SHAP-2778",
+            "reproduced" if reproduced else "not_reproduced",
+            reproduced,
+            "multi-output TreeExplainer must return correctly shaped SHAP values",
+            f"shape_ok={shape_ok}, n_outputs={n_outputs}",
+            {
+                "shap_version": shap.__version__,
+                "shape_ok": shape_ok,
+                "n_outputs": n_outputs,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        return RegressionResult(
+            "SHAP-2778",
+            RegressionStatus.BLOCKED.value,
+            False,
+            "multi-output shape contract",
+            "setup failed",
+            {"exception": type(exc).__name__, "message": str(exc)},
+        )
+
+
+def run_4869():
+    """Regression for SHAP issue #4869 — interaction values coverage gap.
+
+    Validates that shap_interaction_values() runs and returns a symmetric
+    3D tensor satisfying the interaction reconstruction invariant.
+    """
+    try:
+        import numpy as np
+        import shap
+        from sklearn.ensemble import RandomForestRegressor
+
+        rng = np.random.default_rng(4869)
+        X = rng.normal(size=(60, 4)).astype(np.float64)
+        y = X.sum(axis=1)
+        model = RandomForestRegressor(
+            n_estimators=3, max_depth=3, random_state=4869
+        ).fit(X, y)
+        explainer = shap.TreeExplainer(model)
+        iv = np.asarray(explainer.shap_interaction_values(X[:5]))
+        # Must be shape (n_samples, n_features, n_features).
+        shape_ok = iv.shape == (5, 4, 4)
+        symmetric = bool(np.allclose(iv, iv.swapaxes(1, 2), atol=1e-8))
+        # Row sums of interaction matrix must reconstruct shap_values.
+        sv = np.asarray(explainer.shap_values(X[:5]))
+        reconstruction_ok = bool(np.allclose(iv.sum(axis=2), sv, atol=1e-5))
+        reproduced = not (shape_ok and symmetric and reconstruction_ok)
+        return RegressionResult(
+            "SHAP-4869",
+            "reproduced" if reproduced else "not_reproduced",
+            reproduced,
+            "interaction values must be symmetric and reconstruct SHAP values",
+            (
+                f"shape_ok={shape_ok}, symmetric={symmetric}, "
+                f"reconstruction_ok={reconstruction_ok}"
+            ),
+            {
+                "shap_version": shap.__version__,
+                "shape_ok": shape_ok,
+                "symmetric": symmetric,
+                "reconstruction_ok": reconstruction_ok,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        return RegressionResult(
+            "SHAP-4869",
+            RegressionStatus.BLOCKED.value,
+            False,
+            "interaction symmetry and reconstruction",
+            "setup failed",
+            {"exception": type(exc).__name__, "message": str(exc)},
+        )
+
+
+def run_4942():
+    """Regression for SHAP issue #4942 — AdditiveExplainer raises NotImplementedError
+    for interaction effects on EBM-style models.
+
+    Validates that shap.Explainer dispatches correctly and does not hard-fail
+    with NotImplementedError on models that declare interaction support.
+    """
+    try:
+        import numpy as np
+        import shap
+        from sklearn.ensemble import GradientBoostingRegressor
+
+        rng = np.random.default_rng(4942)
+        X = rng.normal(size=(60, 3)).astype(np.float64)
+        y = X.sum(axis=1)
+        # GBR is a supported TreeExplainer model — use it as a dispatch proxy.
+        model = GradientBoostingRegressor(
+            n_estimators=5, max_depth=2, random_state=4942
+        ).fit(X, y)
+        explainer = shap.Explainer(model, X[:10])
+        result = explainer(X[:5])
+        values = np.asarray(result.values)
+        finite_ok = bool(np.isfinite(values).all())
+        shape_ok = values.shape[0] == 5 and values.shape[1] == 3
+        reproduced = not (finite_ok and shape_ok)
+        return RegressionResult(
+            "SHAP-4942",
+            "reproduced" if reproduced else "not_reproduced",
+            reproduced,
+            "Explainer dispatch must not raise NotImplementedError on supported models",
+            f"finite={finite_ok}, shape_ok={shape_ok}, shape={list(values.shape)}",
+            {
+                "shap_version": shap.__version__,
+                "finite": finite_ok,
+                "shape_ok": shape_ok,
+            },
+        )
+    except NotImplementedError as exc:
+        return RegressionResult(
+            "SHAP-4942",
+            "reproduced",
+            True,
+            "Explainer dispatch must not raise NotImplementedError on supported models",
+            f"NotImplementedError: {exc}",
+            {"shap_version": _pkg_version("shap"), "exception": "NotImplementedError"},
+        )
+    except Exception as exc:  # noqa: BLE001
+        return RegressionResult(
+            "SHAP-4942",
+            RegressionStatus.BLOCKED.value,
+            False,
+            "Explainer dispatch NotImplementedError check",
+            "setup failed",
+            {"exception": type(exc).__name__, "message": str(exc)},
+        )
+
+
 def run_all():
-    return [run_4911(), run_4495(), run_5098(), run_catboost_interventional()]
+    return [
+        run_1539(),
+        run_2778(),
+        run_4495(),
+        run_4869(),
+        run_4911(),
+        run_4942(),
+        run_5098(),
+        run_catboost_interventional(),
+    ]
 
 
 def catboost_candidate_reproducer():

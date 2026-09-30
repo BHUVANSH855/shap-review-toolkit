@@ -298,6 +298,39 @@ def run_bridge(
     }
 
 
+def _traceback_contains_shap_frame(traceback: str) -> bool:
+    """Return True only when a SHAP module frame appears in the traceback.
+
+    Keyword matching on exception messages is too broad — sklearn, numpy and
+    pandas raise messages containing "tree", "explainer" and "shap" for
+    reasons unrelated to SHAP bugs.  Checking for a SHAP file path in the
+    traceback frame lines is a much stronger signal: it means execution was
+    actually inside SHAP code when the exception occurred.
+
+    Frame lines in Python tracebacks look like:
+      File "/path/to/shap/_explanation.py", line 42, in shap_values
+    We match on the file path segment only, not on the function name or
+    message, to avoid false positives from error messages quoting SHAP APIs.
+    """
+    if not traceback:
+        return False
+    for line in traceback.splitlines():
+        # Match only "File ..." lines — not exception message lines.
+        stripped = line.strip()
+        if not stripped.startswith("File "):
+            continue
+        # The path segment is between the first pair of quotes.
+        if '"/shap/' in stripped or "\\shap\\" in stripped or "/site-packages/shap/" in stripped:
+            return True
+        # Editable installs: path contains "shap" as a directory component.
+        # Be conservative: require it to be a directory boundary, not a
+        # substring of another package name (e.g. "reshap", "shapper").
+        import re as _re
+        if _re.search(r'[/\\]shap[/\\]', stripped):
+            return True
+    return False
+
+
 def _classify_anomaly(
     exec_result: dict[str, Any],
     oracle: dict[str, Any],
@@ -306,7 +339,10 @@ def _classify_anomaly(
 
     Classification is deliberately conservative. A runtime exception does
     not automatically imply a specific SHAP bug class unless the evidence
-    strongly identifies the failure mode.
+    strongly identifies the failure mode.  Exception message keyword matching
+    is intentionally avoided — use traceback frame inspection instead so that
+    sklearn/numpy/pandas errors whose messages happen to contain "shap",
+    "tree", or "explainer" are not misclassified as SHAP bugs.
     """
     if exec_result.get("timeout"):
         return {
@@ -340,7 +376,7 @@ def _classify_anomaly(
                 "requires_followup": True,
             }
 
-        if "shap" in message or "tree" in message or "explainer" in message:
+        if _traceback_contains_shap_frame(exec_result.get("traceback", "")):
             return {
                 "kind": "SHAP_EXCEPTION",
                 "bug_class": None,

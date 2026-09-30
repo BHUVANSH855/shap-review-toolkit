@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import multiprocessing
 import platform
 import random
 import sys
@@ -18,6 +19,21 @@ from .oracles.tree import evaluate_execution
 # Default per-iteration timeout.
 DEFAULT_CASE_TIMEOUT: int = 30
 
+
+def _fuzz_worker(queue: multiprocessing.Queue, case: dict) -> None:
+    """Module-level worker so it is picklable on Windows (spawn context)."""
+    try:
+        queue.put(run_case(case))
+    except Exception as exc:  # noqa: BLE001
+        import traceback as _tb
+        queue.put({
+            "executed": True,
+            "failed": True,
+            "exception": type(exc).__name__,
+            "message": str(exc),
+            "traceback": _tb.format_exc(limit=10),
+            "case": case,
+        })
 
 class TreeExplainerFuzzer:
     def __init__(self, seed: int = 0, case_timeout: int = DEFAULT_CASE_TIMEOUT):
@@ -99,30 +115,75 @@ class TreeExplainerFuzzer:
         }
 
     def _run_case_with_timeout(self, case: dict) -> dict:
-        """Run case with a per-iteration timeout using ThreadPoolExecutor."""
-        import concurrent.futures
+        """Run case in a child process with a hard OS-level timeout.
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(run_case, case)
-            try:
-                return future.result(timeout=self.case_timeout)
-            except concurrent.futures.TimeoutError:
-                return {
-                    "executed": True,
-                    "failed": True,
-                    "timeout": True,
-                    "exception": "TimeoutError",
-                    "message": f"case exceeded {self.case_timeout}s timeout",
-                    "traceback": "",
-                    "case": case,
-                }
+        Uses a module-level worker (_fuzz_worker) so it is picklable on
+        Windows where multiprocessing uses the spawn start method.
+        multiprocessing.Process.terminate() sends SIGTERM on POSIX and
+        TerminateProcess on Windows — the worker is killed at OS level
+        without blocking the parent, unlike ThreadPoolExecutor which blocks
+        until the thread finishes regardless of the future timeout.
+        """
+        queue: multiprocessing.Queue = multiprocessing.Queue(maxsize=1)
+        proc = multiprocessing.Process(
+            target=_fuzz_worker, args=(queue, case), daemon=True
+        )
+        proc.start()
+        proc.join(timeout=self.case_timeout)
+
+        if proc.is_alive():
+            proc.terminate()
+            proc.join(timeout=5)
+            if proc.is_alive():
+                proc.kill()
+                proc.join(timeout=2)
+            return {
+                "executed": True,
+                "failed": True,
+                "timeout": True,
+                "exception": "TimeoutError",
+                "message": (
+                    f"case exceeded {self.case_timeout}s timeout"
+                    " — worker process terminated"
+                ),
+                "traceback": "",
+                "case": case,
+            }
+
+        if not queue.empty():
+            return queue.get_nowait()
+
+        return {
+            "executed": True,
+            "failed": True,
+            "timeout": False,
+            "exception": "WorkerError",
+            "message": "worker process exited without returning a result",
+            "traceback": "",
+            "case": case,
+        }
 
     @staticmethod
     def _failure_fingerprint(result: dict) -> str:
-        """Coarse fingerprint for crash deduplication."""
+        """Fingerprint for crash deduplication.
+
+        Uses exception type + full message + the innermost traceback frame
+        (file + line number) so that two structurally different crashes that
+        happen to share the same exception type and a similar message prefix
+        are not incorrectly merged into a single deduplicated entry.
+        """
         exc_type = result.get("exception", "")
-        msg_prefix = str(result.get("message", ""))[:100]
-        return hashlib.sha256(f"{exc_type}:{msg_prefix}".encode()).hexdigest()[:16]
+        message = str(result.get("message", ""))
+        # Extract innermost frame from traceback for structural identity.
+        tb = result.get("traceback", "")
+        innermost = ""
+        if tb:
+            for line in tb.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("File "):
+                    innermost = stripped
+        payload = f"{exc_type}:{message}:{innermost}"
+        return hashlib.sha256(payload.encode()).hexdigest()[:24]
 
     def run(self, iterations: int = 10):
         campaign_provenance = self._campaign_provenance(iterations)

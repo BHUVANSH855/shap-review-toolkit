@@ -1,1 +1,0 @@
-{"id":"treeexplainer-docs","url":"https://shap.readthedocs.io/en/latest/generated/shap.TreeExplainer.html","supports":["SHAP-01","SHAP-02","SHAP-03"],"contracts":["additivity","output-space","feature-perturbation","interaction-shape"]}

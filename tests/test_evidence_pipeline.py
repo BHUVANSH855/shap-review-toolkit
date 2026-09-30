@@ -46,7 +46,7 @@ def test_evidence_corpus_has_canonical_primary_records():
     from shap_review.evidence import EvidenceCorpus
 
     corpus = EvidenceCorpus.from_directory(
-        Path(__file__).parents[1] / "data/evidence/issues"
+        Path(__file__).parents[1] / "shap_review/resources/evidence/issues"
     )
 
     assert len(corpus.records) >= 7

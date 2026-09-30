@@ -41,9 +41,15 @@ def test_sanitizer_clean_is_not_memory_safety_confirmation(tmp_path: Path):
 
     result = run_sanitized(script, "asan")
 
+    # SANITIZER_CLEAN is only valid on a confirmed instrumented binary.
+    # On a standard Python build the verdict will be NOT_INSTRUMENTED or
+    # INSTRUMENTATION_UNKNOWN — both correctly indicate that a clean run
+    # carries no memory-safety meaning.
     assert result["verdict"] in {
         "SANITIZER_CLEAN",
         "SANITIZER_EXECUTION_FAILED",
+        "NOT_INSTRUMENTED",
+        "INSTRUMENTATION_UNKNOWN",
     }
     assert result["memory_safety_confirmation"] is False
 

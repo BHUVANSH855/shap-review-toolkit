@@ -26,7 +26,7 @@ def promote_reproduced(
                     "claim": e.note,
                     "passed": True,
                     "confidence": min(
-                        1.0, max(0.0, e.strength / 10 if e.strength else 1.0)
+                        1.0, max(0.1, e.strength / 10 if e.strength else 0.1)
                     ),
                 }
             )
