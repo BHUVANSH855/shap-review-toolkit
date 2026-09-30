@@ -82,10 +82,16 @@ class EvidenceItem:
 
     @property
     def independent(self) -> bool:
-        """Compatibility field; true only when the item is intrinsically valid.
+        """Item-level structural independence check.
 
-        Pairwise independence is determined by ``EvidenceGraph`` and is not
-        represented by this item-level property.
+        Returns ``True`` only when this item is ``intrinsically_valid``.
+
+        **This is NOT pairwise independence.**  Two items that are both
+        ``intrinsically_valid`` may still be correlated (shared execution_id,
+        fixture_id, etc.).  Pairwise independence is determined by
+        ``EvidenceGraph`` and is only accessible through
+        ``EvidenceChain.independent_items()`` when a graph is attached via
+        ``build_chain()``.  Always use ``build_chain()`` to construct chains.
         """
         return self.intrinsically_valid
 
@@ -129,7 +135,22 @@ class EvidenceChain:
             and item.intrinsically_valid
         )
 
-    def independent_items(self):
+    def independent_items(self) -> list[EvidenceItem]:
+        """Return the subset of items that are pairwise independent.
+
+        When a provenance graph is attached (via ``build_chain()``) pairwise
+        independence is determined by ``EvidenceGraph.is_independent()``.
+
+        When no graph is attached **and** there is more than one scoring-
+        eligible item, only the first item is returned.  This conservative
+        fallback prevents inflated confidence scores when the caller has
+        bypassed ``build_chain()``.  Two items that share an execution_id
+        or fixture_id would both be counted without this guard, which can
+        inflate HIGH_CONFIDENCE or CONFIRMED verdicts incorrectly.
+
+        Always use ``build_chain()`` to construct evidence chains so that
+        pairwise correlation is correctly detected.
+        """
         eligible = [
             item
             for item in self.items
@@ -137,9 +158,11 @@ class EvidenceChain:
         ]
 
         if self.graph is None:
-            return eligible
+            # Conservative fallback: return at most one item to prevent
+            # false-confidence inflation from undetected correlations.
+            return eligible[:1]
 
-        selected = []
+        selected: list[EvidenceItem] = []
         for item in eligible:
             if item.evidence_id not in self.graph.nodes:
                 continue
@@ -226,11 +249,14 @@ class EvidenceChain:
             "evidence_strength_score": round(self.evidence_strength_score(), 3),
             "score": round(self.evidence_strength_score(), 3),
             "independent_evidence_kinds": self.independent_kinds(),
+            "graph_attached": self.graph is not None,
             "items": [i.to_dict() for i in self.items],
             "independence_policy": (
                 "Pairwise independence is graph-derived; execution, "
                 "fixture/input lineage, revision/environment, ancestry and "
-                "transformations are considered."
+                "transformations are considered. "
+                "When no graph is attached only a single item participates "
+                "in scoring (conservative fallback). Always use build_chain()."
             ),
             "score_semantics": (
                 "Heuristic evidence-strength score for prioritization, "

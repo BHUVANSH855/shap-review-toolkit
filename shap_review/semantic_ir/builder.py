@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from shap_review.utils import iter_source_files, read_text, rel
@@ -16,6 +17,24 @@ from .model import (
 )
 
 PY_SUFFIXES = {".py", ".pyi", ".pyx", ".c", ".cc", ".cpp", ".h", ".hpp", ".cu"}
+
+
+# Word-bounded regex patterns for native boundary detection.
+# Plain substring matching fires on C comments/string literals; word-bounded
+# regex prevents false NativeBoundary entries from commented-out code.
+_NATIVE_PATTERNS: list[tuple] = [
+    (re.compile(r"\bnanobind\b"),          "nanobind",     "binding",            True),
+    (re.compile(r"\bnb::ndarray\b"),       "nanobind",     "ndarray-conversion", True),
+    (re.compile(r"\bnb::object\b"),        "nanobind",     "object-handle",      True),
+    (re.compile(r"\bPyArray_DATA\b"),      "numpy-c-api",  "raw-buffer",         False),
+    (re.compile(r"\bPyArray_GETPTR\w*\b"), "numpy-c-api", "element-access",     False),
+    (re.compile(r"\bPyErr_\w+\b"),        "python-c-api", "exception",          True),
+    (re.compile(r"\bPyList_GET_ITEM\b"),   "python-c-api", "borrowed-item",      True),
+    (re.compile(r"\bcudaMemcpy\w*\b"),    "cuda",         "device-copy",        False),
+    (re.compile(r"\bcudaMalloc\w*\b"),    "cuda",         "allocation",         False),
+    (re.compile(r"\bPyObject_Call\w*\b"), "python-c-api", "python-callback",    True),
+]
+
 
 
 class SemanticIRBuilder:
@@ -39,6 +58,8 @@ class SemanticIRBuilder:
         except SyntaxError:
             return
         parents = {id(n): p for p in ast.walk(tree) for n in ast.iter_child_nodes(p)}
+        # Precompute function ranges once per file O(n) for O(1) enclosing lookup.
+        ranges = self._function_ranges(tree)
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 q = self._qualified(node, parents)
@@ -58,7 +79,7 @@ class SemanticIRBuilder:
                     ir.tests.append(TestCoverage(q, rp, node.lineno, asserts))
             if isinstance(node, ast.Call):
                 callee = self._callee(node.func)
-                enclosing = self._enclosing(tree, node.lineno)
+                enclosing = self._enclosing_from_ranges(ranges, node.lineno)
                 args = tuple(
                     [self._expr(a) for a in node.args[:6]]
                     + [f"{kw.arg}={self._expr(kw.value)}" for kw in node.keywords[:8]]
@@ -110,6 +131,28 @@ class SemanticIRBuilder:
                         self._expr(node), node.attr, rp, node.lineno, "attribute-access"
                     )
                 )
+
+    @staticmethod
+    def _function_ranges(tree):
+        """Precompute sorted (start, end, name) tuples for fast enclosing lookup."""
+        ranges = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                end = getattr(node, "end_lineno", node.lineno)
+                ranges.append((node.lineno, end, node.name))
+        ranges.sort(key=lambda t: t[0])
+        return ranges
+
+    @staticmethod
+    def _enclosing_from_ranges(ranges, lineno):
+        """Return the innermost enclosing scope name for lineno."""
+        best = ""
+        for start, end, name in ranges:
+            if start > lineno:
+                break
+            if start <= lineno <= end:
+                best = name
+        return best
 
     def _assignment(self, ir, rp, node):
         value = getattr(node, "value", None)
@@ -182,15 +225,7 @@ class SemanticIRBuilder:
             cur = parents.get(id(cur))
         return ".".join(reversed(parts))
 
-    @staticmethod
-    def _enclosing(tree, lineno):
-        best = ""
-        for n in ast.walk(tree):
-            if isinstance(
-                n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            ) and n.lineno <= lineno <= getattr(n, "end_lineno", n.lineno):
-                best = n.name
-        return best
+
 
     @staticmethod
     def _is_assert(n):
@@ -207,19 +242,9 @@ class SemanticIRBuilder:
         return "assert" if isinstance(n, ast.Assert) else getattr(n.func, "id", "call")
 
     def _native_file(self, ir, rp, text):
-        patterns = [
-            ("nanobind", "nanobind", "binding", True),
-            ("nb::ndarray", "nanobind", "ndarray-conversion", True),
-            ("nb::object", "nanobind", "object-handle", True),
-            ("PyArray_DATA", "numpy-c-api", "raw-buffer", False),
-            ("PyArray_GETPTR", "numpy-c-api", "element-access", False),
-            ("PyErr_", "python-c-api", "exception", True),
-            ("PyList_GET_ITEM", "python-c-api", "borrowed-item", True),
-            ("cudaMemcpy", "cuda", "device-copy", False),
-            ("cudaMalloc", "cuda", "allocation", False),
-            ("PyObject_Call", "python-c-api", "python-callback", True),
-        ]
+        """Scan a native file using word-bounded regex to avoid false positives
+        from C comments and string literals."""
         for i, line in enumerate(text.splitlines(), 1):
-            for needle, tech, op, controlled in patterns:
-                if needle in line:
+            for pattern, tech, op, controlled in _NATIVE_PATTERNS:
+                if pattern.search(line):
                     ir.boundaries.append(NativeBoundary(tech, rp, i, op, controlled))

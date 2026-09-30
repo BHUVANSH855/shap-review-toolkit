@@ -2,7 +2,7 @@
   "name": "shap_review",
   "version": "0.0.0.dev0",
   "schema_version": "2",
-  "description": "Evidence-driven SHAP repository review engine",
+  "description": "Evidence-driven SHAP repository review engine.",
   "commands": [
     "map",
     "health",
@@ -33,11 +33,13 @@
     "type": "object",
     "properties": {
       "command": {
-        "type": "string"
+        "type": "string",
+        "description": "The toolkit command to execute."
       },
       "arguments": {
         "type": "object",
-        "additionalProperties": true
+        "additionalProperties": true,
+        "description": "Command-specific keyword arguments."
       }
     },
     "required": [
@@ -49,23 +51,40 @@
     "required": [
       "provider",
       "schema_version",
-      "command",
-      "result"
-    ]
+      "command"
+    ],
+    "properties": {
+      "provider": { "type": "string" },
+      "version": { "type": "string" },
+      "schema_version": { "type": "string" },
+      "command": { "type": "string" },
+      "result": { "type": "object", "description": "Present on success." },
+      "error": { "type": "object", "description": "Present on failure; contains kind, message, command, layer." }
+    }
   },
+  "script_execution_commands": [
+    "differential",
+    "cpu-gpu-differential",
+    "differential-versions",
+    "reproduce",
+    "sanitizer"
+  ],
+  "security_note": "Commands in script_execution_commands execute arbitrary Python scripts via subprocess. Only invoke with trusted, controlled input paths.",
   "evidence_model": {
+    "name": "EvidenceChain",
+    "schema_version": "2",
+    "independence_tracking": true,
+    "independent_evidence_required_for_confirmation": true,
     "verdicts": [
+      "UNVALIDATED",
       "STATIC_CANDIDATE",
       "HISTORICALLY_CORRELATED",
       "DYNAMICALLY_VALIDATED",
       "HIGH_CONFIDENCE",
       "CONFIRMED",
-      "CONFIRMED_MEMORY_SAFETY",
-      "UNVALIDATED"
+      "SANITIZER_FINDING",
+      "SANITIZER_CLEAN"
     ],
-    "independent_evidence_required_for_confirmation": true,
-    "name": "EvidenceChain",
-    "schema_version": "2.1",
-    "independence_tracking": true
+    "dynamic_evidence_note": "The 'analyze' command runs a bounded TreeExplainer campaign against the installed SHAP runtime, not the repository under review. The runtime-bridge.json artifact records anomalies but those anomalies do not currently enrich candidate evidence chains because the generic bridge campaign does not set per-candidate fingerprints."
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "shap_review",
-  "description": "Evidence-driven SHAP repository review toolkit",
+  "description": "Evidence-driven SHAP repository review toolkit. Runs semantic analysis, contract oracles, fuzzing, differential analysis, and evidence-chain validation against a SHAP source checkout. SECURITY: commands 'differential', 'reproduce', 'sanitizer', 'cpu-gpu-differential', and 'differential-versions' execute arbitrary Python scripts via subprocess — only use with trusted, controlled paths.",
   "parameters": {
     "type": "object",
     "properties": {
@@ -31,49 +31,18 @@
           "api-era",
           "capabilities",
           "version"
-        ]
+        ],
+        "description": "The toolkit command to execute."
       },
       "arguments": {
         "type": "object",
         "properties": {},
-        "additionalProperties": true
+        "additionalProperties": true,
+        "description": "Command-specific keyword arguments. The 'root' key specifies the repository path for analysis commands."
       }
     },
     "required": [
       "command"
     ]
-  },
-  "version": "0.0.0.dev0",
-  "schema_version": "2",
-  "commands": [
-    "map",
-    "health",
-    "analyze",
-    "report",
-    "hotspots",
-    "explore",
-    "investigate",
-    "reproduce",
-    "fuzz",
-    "fuzz-treeexplainer",
-    "fuzz-protocol",
-    "fuzz-backends",
-    "differential",
-    "cpu-gpu-differential",
-    "regressions",
-    "history",
-    "sanitizer",
-    "differential-versions",
-    "evidence",
-    "semantic-oracle",
-    "native-map",
-    "api-era",
-    "capabilities",
-    "version"
-  ],
-  "evidence_model": {
-    "name": "EvidenceChain",
-    "schema_version": "2.1",
-    "independence_tracking": true
   }
 }

@@ -8,3 +8,4 @@ build/
 .artifacts/
 .fuzz-work/
 **/.out/
+ruff-errors.txt

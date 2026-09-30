@@ -9,17 +9,21 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 
-from .generators.input import generate_input_case
+from .generators.input import generate_input_case  # noqa: F401 — kept for API compat
 from .generators.tree import generate_tree_case
 from .harnesses.treeexplainer import run_case
 from .minimizers.basic import minimize_case
 from .oracles.tree import evaluate_execution
 
+# Default per-iteration timeout.
+DEFAULT_CASE_TIMEOUT: int = 30
+
 
 class TreeExplainerFuzzer:
-    def __init__(self, seed: int = 0):
+    def __init__(self, seed: int = 0, case_timeout: int = DEFAULT_CASE_TIMEOUT):
         self.seed = seed
         self.rng = random.Random(seed)
+        self.case_timeout = max(1, int(case_timeout))
 
     @staticmethod
     def _execution_trace(case: dict) -> dict:
@@ -88,11 +92,37 @@ class TreeExplainerFuzzer:
             **runtime,
             "seed": self.seed,
             "producer": "treeexplainer-fuzzer",
+            "case_timeout": self.case_timeout,
         }
         return {
             **payload,
             "target_fingerprint": self._provenance_fingerprint(payload),
         }
+
+    def _run_case_with_timeout(self, case: dict) -> dict:
+        """Run case with a per-iteration timeout using ThreadPoolExecutor."""
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_case, case)
+            try:
+                return future.result(timeout=self.case_timeout)
+            except concurrent.futures.TimeoutError:
+                return {
+                    "executed": True,
+                    "failed": True,
+                    "timeout": True,
+                    "exception": "TimeoutError",
+                    "message": f"case exceeded {self.case_timeout}s timeout",
+                    "traceback": "",
+                    "case": case,
+                }
+
+    @staticmethod
+    def _failure_fingerprint(result: dict) -> str:
+        """Coarse fingerprint for crash deduplication."""
+        exc_type = result.get("exception", "")
+        msg_prefix = str(result.get("message", ""))[:100]
+        return hashlib.sha256(f"{exc_type}:{msg_prefix}".encode()).hexdigest()[:16]
 
     def run(self, iterations: int = 10):
         campaign_provenance = self._campaign_provenance()
@@ -104,13 +134,11 @@ class TreeExplainerFuzzer:
         ).hexdigest()
 
         results = []
+        seen_failure_fingerprints: dict[str, int] = {}
+        duplicate_failures: int = 0
 
         for i in range(iterations):
             case = generate_tree_case(self.rng)
-
-            generate_input_case(
-                self.rng
-            )  # consume RNG, but don't create dead dimensions
 
             case["input"] = {
                 "samples": case["n_samples"],
@@ -121,7 +149,7 @@ class TreeExplainerFuzzer:
             }
             case["seed"] = self.rng.randrange(2**31)
 
-            result = run_case(case)
+            result = self._run_case_with_timeout(case)
             oracle = evaluate_execution(result)
 
             item = {
@@ -137,7 +165,18 @@ class TreeExplainerFuzzer:
                 },
             }
 
-            if not oracle.get("valid") and result.get("executed"):
+            is_duplicate = False
+            if result.get("failed") and not oracle.get("valid"):
+                fail_fp = self._failure_fingerprint(result)
+                if fail_fp in seen_failure_fingerprints:
+                    seen_failure_fingerprints[fail_fp] += 1
+                    duplicate_failures += 1
+                    is_duplicate = True
+                else:
+                    seen_failure_fingerprints[fail_fp] = 1
+            item["duplicate"] = is_duplicate
+
+            if not oracle.get("valid") and result.get("executed") and not is_duplicate:
                 item["minimized_case"] = minimize_case(case)
 
             results.append(item)
@@ -160,6 +199,12 @@ class TreeExplainerFuzzer:
                 not result["oracle"].get("valid", False)
                 for result in results
             ),
+            "unique_failures": len(seen_failure_fingerprints),
+            "duplicate_failures": duplicate_failures,
+            "timeout_cases": sum(
+                bool(result["execution"].get("timeout")) for result in results
+            ),
+            "case_timeout_seconds": self.case_timeout,
             "skipped_cases": sum(
                 bool(result["execution"].get("skipped"))
                 for result in results

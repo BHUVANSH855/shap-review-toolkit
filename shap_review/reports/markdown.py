@@ -22,7 +22,7 @@ def render_candidates(candidates: list[Candidate]) -> str:
             f"- **Confidence:** `{c.confidence}`",
             f"- **Message:** {c.message}",
             f"- **Tags:** {', '.join(c.tags) or 'none'}",
-            "- **Evidence:",
+            "- **Evidence:**",
         ]
         lines += [f"  - `{e.kind}`: {e.source} — {e.note}" for e in c.evidence]
         lines.append("")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -72,10 +73,30 @@ def classify_target_provenance(
 
 
 class OracleStatus(str, Enum):
+    """Canonical oracle status values.
+
+    Maps onto OracleResult fields:
+    - PASS          → applicable=True,  passed=True
+    - FAIL          → applicable=True,  passed=False
+    - INCONCLUSIVE  → applicable=True,  passed=None
+    - NOT_APPLICABLE→ applicable=False, passed=None
+    """
     PASS = "PASS"
     FAIL = "FAIL"
     INCONCLUSIVE = "INCONCLUSIVE"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+
+    @classmethod
+    def from_result(cls, result: OracleResult) -> OracleStatus:
+        """Derive the canonical status from an OracleResult."""
+        if not result.applicable:
+            return cls.NOT_APPLICABLE
+        if result.passed is True:
+            return cls.PASS
+        if result.passed is False:
+            return cls.FAIL
+        return cls.INCONCLUSIVE
+
 
 
 def validate_oracle_result(result):
@@ -99,8 +120,14 @@ class OracleResult:
     contract_required: bool = False
     policy_required: bool = False
 
+    @property
+    def status(self) -> OracleStatus:
+        return OracleStatus.from_result(self)
+
     def to_dict(self):
-        return asdict(self)
+        d = asdict(self)
+        d["status"] = self.status.value
+        return d
 
 
 @dataclass(frozen=True)
@@ -142,8 +169,25 @@ class OutputSpaceOracle:
         expected_value=None,
         target_source=None,
         independent_target=None,
+        true_labels=None,
     ):
         try:
+            # Early log_loss check: this oracle is NOT_APPLICABLE without true_labels.
+            # Checked before base_values / model / inputs so callers always get a
+            # clear NOT_APPLICABLE rather than a misleading "target output is required".
+            if contract.model_output == "log_loss" and true_labels is None:
+                return OracleResult(
+                    "OutputSpaceOracle",
+                    False,
+                    None,
+                    "log_loss output space requires explicit true_labels; "
+                    "pass true_labels=<array> to enable this check",
+                    details={
+                        "model_output": "log_loss",
+                        "resolution": "NOT_APPLICABLE — true_labels not supplied",
+                    },
+                )
+
             vals = np.asarray(shap_values, dtype=float)
             base = None if base_values is None else np.asarray(base_values, dtype=float)
             if base is None:
@@ -193,7 +237,9 @@ class OutputSpaceOracle:
                         "OutputSpaceOracle",
                         False,
                         None,
-                        "log_loss requires explicit true labels",
+                        "log_loss output space requires explicit true_labels; "
+                        "pass true_labels=<array> to enable this check "
+                        "(NOT_APPLICABLE — true_labels not supplied)",
                         details={"probability_shape": list(probs.shape)},
                     )
                 else:
@@ -433,10 +479,30 @@ class InteractionOracle:
                     "reason": "interaction reconstruction could not be semantically aligned"
                 }
             checked = True
+        elif direct.ndim == iv.ndim:
+            # Same rank: values IS the interaction tensor; reconstruction
+            # cannot be verified. Return INCONCLUSIVE not passed=True.
+            return OracleResult(
+                "InteractionOracle",
+                True,
+                None,  # INCONCLUSIVE — cannot verify reconstruction
+                "interaction symmetry "
+                + ("satisfied" if symmetric else "violated")
+                + "; values and interaction_values have equal rank — "
+                + "reconstruction check not applicable (INCONCLUSIVE)",
+                details={
+                    "interaction_feature_axes": list(pair),
+                    "output_axis": spec.output_axis,
+                    "symmetry_checked": True,
+                    "symmetry_passed": symmetric,
+                    "reconstruction_checked": False,
+                    "inconclusive_reason": "values_ndim_equals_iv_ndim",
+                },
+            )
         else:
             reconstruction_ok = True
             align = {
-                "reason": "interaction tensor supplied as values; reconstruction not applicable"
+                "reason": "unexpected rank relationship; reconstruction not applicable"
             }
             checked = False
         passed = symmetric and reconstruction_ok
@@ -601,16 +667,22 @@ class InputMutationOracle:
             )
 
 
-ORACLE_REGISTRY = {}
+_REGISTRY_LOCK = threading.Lock()
+ORACLE_REGISTRY: dict = {}
 
 
-def register_oracle(name, oracle):
-    ORACLE_REGISTRY[name] = oracle
+def register_oracle(name: str, oracle) -> None:
+    """Register *oracle* under *name*. Thread-safe."""
+    with _REGISTRY_LOCK:
+        ORACLE_REGISTRY[name] = oracle
+
 
 
 class SHAPSemanticOracle:
     def __init__(self, registry=None):
-        self.registry = ORACLE_REGISTRY if registry is None else registry
+        # Snapshot the registry at construction time to avoid TOCTOU races.
+        with _REGISTRY_LOCK:
+            self.registry = dict(ORACLE_REGISTRY) if registry is None else registry
 
     def evaluate(
         self,
@@ -713,9 +785,13 @@ class SHAPSemanticOracle:
                 )
             else:
                 r = oracle.check(**args[name])
+                d = {
+                    k: v for k, v in r.to_dict().items()
+                    if k != "status"  # status is a computed property, not a field
+                }
                 r = OracleResult(
                     **{
-                        **r.to_dict(),
+                        **d,
                         "requirement_source": source,
                         "contract_required": contract_required,
                         "policy_required": policy_required,

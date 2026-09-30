@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -36,12 +40,7 @@ class EvidenceRecord:
         if not self.id or not self.id.startswith("SHAP-EVID-"):
             errors.append("id must start with SHAP-EVID-")
         if self.type not in {
-            "issue",
-            "documentation",
-            "paper",
-            "pull_request",
-            "test",
-            "architecture",
+            "issue", "documentation", "paper", "pull_request", "test", "architecture",
         }:
             errors.append("unsupported evidence type")
         if not self.title:
@@ -60,6 +59,8 @@ class EvidenceRecord:
             errors.append("invalid provenance")
         return errors
 
+
+# Read original DEFAULT_EVIDENCE from original file to preserve it
 
 DEFAULT_EVIDENCE = [
     EvidenceRecord(
@@ -153,37 +154,67 @@ DEFAULT_EVIDENCE = [
 
 class EvidenceCorpus:
     def __init__(self, records=None):
-        self.records = list(records or DEFAULT_EVIDENCE)
+        self.records: list[EvidenceRecord] = list(records or DEFAULT_EVIDENCE)
 
-    def by_bug_class(self, bug_class):
+    def by_bug_class(self, bug_class: str) -> list[EvidenceRecord]:
         return [r for r in self.records if r.bug_class == bug_class]
 
-    def get(self, evidence_id):
+    def get(self, evidence_id: str) -> EvidenceRecord | None:
         return next((r for r in self.records if r.id == evidence_id), None)
 
-    def validate(self):
-        return {r.id: r.validate() for r in self.records if r.validate()}
+    def validate(self) -> dict[str, list[str]]:
+        return {r.id: errs for r in self.records if (errs := r.validate())}
 
-    def as_dict(self):
+    def as_dict(self) -> dict[str, Any]:
         return {r.id: r.to_dict() for r in self.records}
 
-    def save(self, path: Path):
+    def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(self.as_dict(), indent=2, sort_keys=True), encoding="utf-8"
         )
 
     @classmethod
-    def from_directory(cls, directory: Path):
-        records = []
+    def from_directory(cls, directory: Path) -> EvidenceCorpus:
+        """Load canonical evidence records from *directory*.
+
+        Malformed records are logged as warnings rather than silently dropped.
+        Falls back to DEFAULT_EVIDENCE when directory is absent or empty.
+        """
+        records: list[EvidenceRecord] = []
+        load_errors: list[str] = []
+
         for p in sorted(directory.glob("*.json")):
             try:
                 raw = json.loads(p.read_text(encoding="utf-8"))
-                # Only canonical evidence records participate in the corpus; legacy
-                # issue-shape files remain useful to humans but must not duplicate
-                # the source-of-truth records.
-                if raw.get("id", "").startswith("SHAP-EVID-"):
-                    records.append(EvidenceRecord(**raw))
-            except (OSError, json.JSONDecodeError, TypeError):
+            except (OSError, json.JSONDecodeError) as exc:
+                log.warning(
+                    "EvidenceCorpus: skipping %s — could not read/parse: %s",
+                    p.name, exc,
+                )
+                load_errors.append(str(p.name))
                 continue
-        return cls(records or DEFAULT_EVIDENCE)
+
+            if not raw.get("id", "").startswith("SHAP-EVID-"):
+                continue
+
+            try:
+                records.append(EvidenceRecord(**raw))
+            except (TypeError, KeyError) as exc:
+                log.warning(
+                    "EvidenceCorpus: skipping malformed canonical record %s — %s: %s. "
+                    "This file is part of the evidence trust anchor and should be fixed.",
+                    p.name, type(exc).__name__, exc,
+                )
+                load_errors.append(str(p.name))
+
+        if not records:
+            if load_errors:
+                log.warning(
+                    "EvidenceCorpus: no valid SHAP-EVID-* records loaded from %s "
+                    "(%d files had errors); falling back to DEFAULT_EVIDENCE.",
+                    directory, len(load_errors),
+                )
+            return cls(DEFAULT_EVIDENCE)
+
+        return cls(records)

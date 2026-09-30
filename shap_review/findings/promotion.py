@@ -24,10 +24,26 @@ class PromotionPolicy:
             FindingStatus.CONFIRMED,
             FindingStatus.REPORTED,
         }:
-            if chain is None or any(
-                getattr(i, "passed", None) is None for i in chain.items
-            ):
-                raise ValueError("promotion blocked by inconclusive evidence")
+            if chain is None:
+                raise ValueError("promotion blocked: no evidence chain supplied")
+            # Only gate on items that are REQUIRED (policy_required or
+            # contract_required).  Non-required items (e.g. historical issue
+            # refs with passed=None) must not block promotion when all required
+            # runtime oracles have passed.
+            inconclusive_required = [
+                i
+                for i in chain.items
+                if getattr(i, "passed", None) is None
+                and (
+                    getattr(i, "policy_required", False)
+                    or getattr(i, "contract_required", False)
+                )
+            ]
+            if inconclusive_required:
+                names = [getattr(i, "name", repr(i)) for i in inconclusive_required]
+                raise ValueError(
+                    f"promotion blocked by inconclusive required oracle results: {names}"
+                )
         if target == FindingStatus.REPRODUCED and self.require_dynamic_for_reproduced:
             if chain is None or not any(
                 i.passed is True and i.kind.value in {"dynamic", "reproduction"}

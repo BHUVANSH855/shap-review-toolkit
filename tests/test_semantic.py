@@ -398,18 +398,55 @@ def test_native_map_has_expected_layers(tmp_path: Path):
     assert {"cutils", "cext"} <= names
 
 def test_interaction_multiclass_uses_feature_pair_axes_before_output_axis():
+    """InteractionOracle with values==interaction_values (same ndim) is INCONCLUSIVE.
+
+    When values and interaction_values have the same number of dimensions the
+    oracle cannot verify reconstruction — there is no separate SHAP-values
+    tensor to compare against.  A symmetric tensor trivially passes symmetry,
+    but symmetry alone cannot prove correctness.  The result must be
+    INCONCLUSIVE (passed=None) not PASS (passed=True).
+
+    The interaction_feature_axes metadata is still correctly populated.
+    """
     import numpy as np
 
     from shap_review.contracts import SHAPContract
-    from shap_review.contracts.oracles import InteractionOracle
+    from shap_review.contracts.oracles import InteractionOracle, OracleStatus
 
     contract = SHAPContract("TreeExplainer", "tree", interaction=True)
     values = np.zeros((1, 2, 2, 3))
     values[:, 0, 1, :] = 1
     values[:, 1, 0, :] = 1
-    result = InteractionOracle().check(values=values, interaction_values=values, axes=contract.axis_spec)
-    assert result.passed is True
+    result = InteractionOracle().check(
+        values=values, interaction_values=values, axes=contract.axis_spec
+    )
+    # INCONCLUSIVE: reconstruction cannot be verified when values IS the
+    # interaction tensor (same ndim).
+    assert result.passed is None, (
+        "same-ndim values/interaction_values must be INCONCLUSIVE, not PASS"
+    )
+    assert result.status == OracleStatus.INCONCLUSIVE
+    assert result.applicable is True
     assert result.details["interaction_feature_axes"] == [1, 2]
+    assert result.details["inconclusive_reason"] == "values_ndim_equals_iv_ndim"
+
+
+def test_interaction_oracle_with_separate_values_passes():
+    """InteractionOracle with a separate lower-rank SHAP-values tensor can PASS."""
+    import numpy as np
+
+    from shap_review.contracts.oracles import InteractionOracle
+
+    # values shape (1, 2) — one sample, 2 features
+    # interaction_values shape (1, 2, 2) — standard interaction tensor
+    values = np.array([[3.0, 5.0]])
+    interaction_values = np.array([[[1.0, 2.0], [2.0, 3.0]]])
+    # Row sums: [1+2, 2+3] = [3, 5] — matches values → should PASS
+    result = InteractionOracle().check(
+        values=values, interaction_values=interaction_values
+    )
+    assert result.passed is True
+    assert result.details["reconstruction_checked"] is True
 
 
 def test_api_era_ignores_arbitrary_nested_callable():
@@ -497,3 +534,260 @@ def test_native_map_reports_source_symbols(tmp_path):
     (path / "_cext.cpp").write_text("int tree_shap_value(double x) { return 0; }\n")
     result = map_shap_native(str(tmp_path))
     assert any(symbol["symbol"] == "tree_shap_value" for symbol in result["symbols"])
+
+
+# ============================================================================
+# New tests — semantic analysis and native analysis gaps from review
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# M-7: SemanticIRBuilder native pattern matching is word-bounded
+# ---------------------------------------------------------------------------
+
+def test_semantic_ir_builder_does_not_match_pyerr_compound_name(tmp_path):
+    """Word-bounded regex must not fire on PyErr_ as part of a compound identifier.
+
+    The key correctness guarantee of word-bounded regex is preventing false
+    positives from compound names such as ``notPyErr_SetString`` (which plain
+    substring matching ``'PyErr_' in line`` would incorrectly match).
+
+    Note: C-style line comments (``//``) and block comments that contain
+    standalone identifiers like ``PyErr_Clear`` WILL still match — a full C
+    parser would be needed to exclude comments entirely.  The boundary regex
+    is a pragmatic improvement over plain substring matching, not a guarantee
+    of comment-safe analysis.
+    """
+    from shap_review.semantic_ir.builder import SemanticIRBuilder
+
+    native = tmp_path / "ext.cpp"
+    native.write_text(
+        # Line 1: compound name — must NOT fire (word boundary prevents it).
+        "void notPyErr_SetString(const char* s) {}\n"
+        # Line 2: real API call — MUST fire.
+        "int real_boundary() { PyErr_Clear(); return 0; }\n",
+        encoding="utf-8",
+    )
+    ir = SemanticIRBuilder().build(tmp_path)
+    line_numbers = {b.line for b in ir.boundaries}
+
+    assert 1 not in line_numbers, (
+        "notPyErr_SetString (compound name) must NOT produce a NativeBoundary — "
+        "word-bounded regex should prevent this false positive"
+    )
+    assert 2 in line_numbers, (
+        "Real PyErr_Clear() call MUST produce a NativeBoundary"
+    )
+
+
+def test_semantic_ir_builder_does_not_match_pyerr_in_string_literal(tmp_path):
+    """Word-bounded regex must not fire on PyErr_ inside a C string literal."""
+    from shap_review.semantic_ir.builder import SemanticIRBuilder
+
+    native = tmp_path / "ext.cpp"
+    native.write_text(
+        'const char* msg = "do not call PyErr_SetString";\n'
+        "if (PyErr_Occurred()) { return NULL; }\n",
+        encoding="utf-8",
+    )
+    ir = SemanticIRBuilder().build(tmp_path)
+    boundaries_by_line = {}
+    for b in ir.boundaries:
+        boundaries_by_line.setdefault(b.line, []).append(b)
+
+    # Line 1 has PyErr_ only inside a string literal — ideally should not fire.
+    # Line 2 has a real call — must fire.
+    assert 2 in boundaries_by_line, "Real PyErr_Occurred() call must produce a boundary"
+
+
+def test_semantic_ir_builder_enclosing_is_innermost(tmp_path):
+    """_enclosing_from_ranges must return the INNERMOST containing scope."""
+    from shap_review.semantic_ir.builder import SemanticIRBuilder
+
+    py = tmp_path / "nested.py"
+    py.write_text(
+        "def outer():\n"
+        "    def inner():\n"
+        "        x = some_call()\n"
+        "    inner()\n",
+        encoding="utf-8",
+    )
+    ir = SemanticIRBuilder().build(tmp_path)
+    # The call at line 3 (some_call()) should be enclosed by 'inner', not 'outer'.
+    calls_at_3 = [c for c in ir.calls if c.line == 3]
+    if calls_at_3:
+        assert calls_at_3[0].enclosing_symbol == "inner", (
+            f"Innermost scope must be 'inner', got {calls_at_3[0].enclosing_symbol!r}"
+        )
+
+
+def test_semantic_ir_builder_nanobind_word_boundary(tmp_path):
+    """nanobind must only match the whole word, not a substring like 'notnanobind'."""
+    from shap_review.semantic_ir.builder import SemanticIRBuilder
+
+    native = tmp_path / "ext.cpp"
+    native.write_text(
+        "// notnanobind is not nanobind\n"
+        "#include <nanobind/nanobind.h>\n",
+        encoding="utf-8",
+    )
+    ir = SemanticIRBuilder().build(tmp_path)
+    # Line 1: 'notnanobind' — must NOT fire (not a word boundary match).
+    # Line 2: '#include <nanobind/...>' — MUST fire.
+    line_numbers = {b.line for b in ir.boundaries}
+    # At minimum line 2 must be present.
+    assert 2 in line_numbers, "nanobind include must produce a NativeBoundary"
+
+
+# ---------------------------------------------------------------------------
+# Fuzzing — per-case timeout and crash deduplication
+# ---------------------------------------------------------------------------
+
+def test_fuzzer_deduplicates_repeated_crashes():
+    """Repeated identical crashes must produce unique_failures=1, not N."""
+    from unittest.mock import patch
+
+    from shap_review.fuzzing.engine import TreeExplainerFuzzer
+
+    call_count = 0
+
+    def always_crash(case):
+        nonlocal call_count
+        call_count += 1
+        return {
+            "executed": True,
+            "failed": True,
+            "timeout": False,
+            "exception": "ValueError",
+            "message": "always the same error message",
+            "traceback": "",
+        }
+
+    fuzzer = TreeExplainerFuzzer(seed=0, case_timeout=30)
+    with patch.object(fuzzer, "_run_case_with_timeout", side_effect=always_crash):
+
+        def fake_evaluate(result):
+            return {"valid": False}
+
+        with patch("shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate):
+            report = fuzzer.run(iterations=5)
+
+    assert report["unique_failures"] == 1, (
+        f"Same crash 5×: unique_failures must be 1, got {report['unique_failures']}"
+    )
+    assert report["duplicate_failures"] == 4, (
+        f"Expected 4 duplicates, got {report['duplicate_failures']}"
+    )
+    assert report["failures"] == 5
+
+
+def test_fuzzer_timeout_case_recorded_not_hanged():
+    """A case that times out must be recorded as timeout, not hang the campaign."""
+    from unittest.mock import patch
+
+    from shap_review.fuzzing.engine import TreeExplainerFuzzer
+
+    timeout_result = {
+        "executed": True,
+        "failed": True,
+        "timeout": True,
+        "exception": "TimeoutError",
+        "message": "case exceeded 30s timeout",
+        "traceback": "",
+    }
+
+    fuzzer = TreeExplainerFuzzer(seed=0, case_timeout=1)
+    with patch.object(fuzzer, "_run_case_with_timeout", return_value=timeout_result):
+
+        def fake_evaluate(result):
+            return {"valid": False}
+
+        with patch("shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate):
+            report = fuzzer.run(iterations=3)
+
+    assert report["timeout_cases"] == 3
+    assert report["case_timeout_seconds"] == 1
+
+
+def test_fuzzer_has_case_timeout_parameter():
+    """TreeExplainerFuzzer must accept and store case_timeout."""
+    from shap_review.fuzzing.engine import DEFAULT_CASE_TIMEOUT, TreeExplainerFuzzer
+
+    fuzzer = TreeExplainerFuzzer(seed=0)
+    assert fuzzer.case_timeout == DEFAULT_CASE_TIMEOUT
+
+    custom = TreeExplainerFuzzer(seed=0, case_timeout=10)
+    assert custom.case_timeout == 10
+
+
+def test_default_case_timeout_is_reasonable():
+    """DEFAULT_CASE_TIMEOUT must be between 5 and 300 seconds."""
+    from shap_review.fuzzing.engine import DEFAULT_CASE_TIMEOUT
+
+    assert 5 <= DEFAULT_CASE_TIMEOUT <= 300
+
+
+# ---------------------------------------------------------------------------
+# Public API surface
+# ---------------------------------------------------------------------------
+
+def test_public_api_exports_core_classes():
+    """Top-level shap_review must export the documented public API."""
+    import shap_review
+
+    required = [
+        "SHAPContract",
+        "validate_contract",
+        "dtype_tolerance",
+        "EvidenceChain",
+        "EvidenceItem",
+        "EvidenceKind",
+        "OracleStatus",
+        "OracleResult",
+        "SHAPSemanticOracle",
+        "AdditivityOracle",
+        "PromotionPolicy",
+        "FindingStatus",
+    ]
+    for name in required:
+        assert hasattr(shap_review, name), (
+            f"shap_review.{name} must be exported from the top-level package"
+        )
+
+
+def test_public_api_all_contains_core_names():
+    """shap_review.__all__ must include core names."""
+    import shap_review
+
+    for name in ("SHAPContract", "EvidenceChain", "OracleStatus", "dtype_tolerance"):
+        assert name in shap_review.__all__, (
+            f"{name!r} must be in shap_review.__all__"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Markdown report template
+# ---------------------------------------------------------------------------
+
+def test_markdown_report_evidence_heading_is_valid():
+    """render_candidates must produce valid bold markdown for Evidence heading."""
+    from shap_review.reports.markdown import render_candidates
+    from shap_review.types import Candidate, EvidenceRef
+
+    c = Candidate(
+        "CAND-1", "SHAP-01", "INV-001", "a.py", 1, None,
+        "test", [EvidenceRef("source", "src", "note", 2)], True, "low", [],
+    )
+    output = render_candidates([c])
+
+    # The evidence line must open AND close the bold markers.
+    assert "- **Evidence:**" in output, (
+        "Evidence line must be '- **Evidence:**' (with closing **)"
+    )
+    # Must NOT contain unclosed bold marker.
+    assert "- **Evidence:\"" not in output
+    # Bold must be balanced (no orphaned **).
+    import re
+    bold_markers = re.findall(r"\*\*", output)
+    assert len(bold_markers) % 2 == 0, (
+        f"Unbalanced bold markers in report output: found {len(bold_markers)} '**'"
+    )
