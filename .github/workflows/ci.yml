@@ -28,7 +28,7 @@ jobs:
         run: pip install -e ".[integration]"
 
       - name: Lint
-        run: ruff check .
+        run: python -m ruff check .
 
       - name: Run tests (excluding slow fuzzing)
         run: |
