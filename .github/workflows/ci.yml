@@ -10,6 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
@@ -20,12 +21,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
-      - name: Install toolkit (base)
+      - name: Install toolkit and test dependencies
         run: pip install -e ".[test]"
 
       - name: Install integration dependencies
         run: pip install -e ".[integration]"
+        timeout-minutes: 10
 
       - name: Lint
         run: python -m ruff check .
@@ -45,9 +48,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies
         run: pip install -e ".[test,integration]"
+        timeout-minutes: 10
 
       - name: Fuzzing smoke test (3 iterations)
         run: |
