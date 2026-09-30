@@ -24,12 +24,13 @@ class CPUGPUDifferential:
         try:
             importlib.import_module("cupy")
             return True
-        except Exception:
+        except (ImportError, ModuleNotFoundError):
             return False
 
     def run(self, cpu_callable, gpu_callable, *args, **kwargs):
         cpu = self._run("cpu", cpu_callable, args, kwargs)
         gpu = self._run("gpu", gpu_callable, args, kwargs)
+
         if not cpu.executed or not gpu.executed:
             return {
                 "applicable": False,
@@ -37,7 +38,9 @@ class CPUGPUDifferential:
                 "cpu": asdict(cpu),
                 "gpu": asdict(gpu),
             }
+
         comparison = self._compare(cpu.result, gpu.result)
+
         return {
             "applicable": True,
             "equal": comparison["equal"],
@@ -51,8 +54,14 @@ class CPUGPUDifferential:
     def _run(self, name, fn, args, kwargs):
         try:
             return BackendRun(name, True, True, fn(*args, **kwargs))
-        except Exception as exc:
-            return BackendRun(name, True, False, None, f"{type(exc).__name__}: {exc}")
+        except (RuntimeError, ValueError, TypeError, ImportError) as exc:
+            return BackendRun(
+                name,
+                True,
+                False,
+                None,
+                f"{type(exc).__name__}: {exc}",
+            )
 
     def _compare(self, a, b):
         from shap_review.differential.semantic import compare_shap_contract

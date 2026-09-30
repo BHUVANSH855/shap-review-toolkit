@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import ClassVar
 
 from shap_review.utils import iter_source_files, read_text, rel
 
@@ -47,7 +48,7 @@ class SemanticGraph:
 
 
 class SHAPSemanticMapper:
-    EXPLAINERS = {
+    EXPLAINERS: ClassVar[dict[str, str]] = {
         "TreeExplainer": "tree",
         "ExactExplainer": "exact",
         "PermutationExplainer": "permutation",
@@ -58,7 +59,7 @@ class SHAPSemanticMapper:
         "GradientExplainer": "gradient",
         "AdditiveExplainer": "additive",
     }
-    MASKERS = {
+    MASKERS: ClassVar[dict[str, str]] = {
         "Tabular": "tabular",
         "Partition": "partition",
         "Image": "image",

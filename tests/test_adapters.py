@@ -33,6 +33,9 @@ from adapters import ClaudeAdapter, GeminiAdapter, OpenAIAdapter
 from adapters.base import _SCRIPT_EXECUTION_COMMANDS, BaseReviewAdapter
 from adapters.interface import AdapterCapabilities, AdapterError, AdapterRequest
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ADAPTERS_ROOT = REPO_ROOT / "adapters"
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -275,9 +278,10 @@ def test_script_execution_commands_log_warning(caplog):
 
     adapter = ClaudeAdapter()
     # Patch dispatch so we don't need a real script file.
-    with patch("adapters.base.dispatch", return_value={"status": "ok"}):
-        with caplog.at_level(logging.WARNING, logger="adapters.base"):
-            adapter.invoke("reproduce", {"root": ".", "script": "x.py"})
+    with patch("adapters.base.dispatch", return_value={"status": "ok"}), caplog.at_level(
+        logging.WARNING, logger="adapters.base"
+    ):
+        adapter.invoke("reproduce", {"root": ".", "script": "x.py"})
     assert any(
         "subprocess" in r.message.lower() or "script" in r.message.lower()
         for r in caplog.records
@@ -343,13 +347,19 @@ def test_provider_manifests_match_canonical():
             "tool-definition.json",
             "function-declaration.json",
         ):
-            path = Path("adapters") / provider / name
+            path = ADAPTERS_ROOT / provider / name
             if not path.exists():
                 continue
+
             checked += 1
             manifest = json.loads(path.read_text(encoding="utf-8"))
             _assert_provider_manifest_contract(
-                provider, name, manifest, capabilities, SCHEMA_VERSION, VERSION
+                provider,
+                name,
+                manifest,
+                capabilities,
+                SCHEMA_VERSION,
+                VERSION,
             )
 
     assert checked > 0, "no provider manifests were discovered"
@@ -397,7 +407,7 @@ def test_manifests_contain_security_note():
 def test_openai_tool_definition_nested_command_enum_matches_capabilities():
     from shap_review.version import CAPABILITIES
 
-    path = Path("adapters/openai/tool-definition.json")
+    path = ADAPTERS_ROOT / "openai" / "tool-definition.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
     declared = manifest["function"]["parameters"]["properties"]["command"]["enum"]
     assert declared == list(CAPABILITIES)

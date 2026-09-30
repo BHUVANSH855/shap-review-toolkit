@@ -47,14 +47,16 @@ def reproduce_callable(
             outcomes.append(
                 json.dumps(runner(), sort_keys=True, default=_stable_default)
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             outcomes.append(f"EXCEPTION:{type(exc).__name__}:{exc}")
+
     try:
         import shap
 
         version = getattr(shap, "__version__", None)
-    except Exception:
+    except (ImportError, AttributeError):
         version = None
+
     meta = dict(metadata or {})
     meta.setdefault("argv", __import__("sys").argv[:])
     meta.setdefault("cwd", __import__("os").getcwd())
@@ -62,6 +64,7 @@ def reproduce_callable(
     meta.setdefault("model_id", meta.get("model_id"))
     meta.setdefault("input_hash", meta.get("input_hash"))
     meta.setdefault("exact_command", " ".join(__import__("sys").argv))
+
     return ReproductionResult(
         case_id,
         count,

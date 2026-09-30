@@ -1,1 +1,1 @@
-from .markdown import render_candidates
+from .markdown import render_candidates as render_candidates

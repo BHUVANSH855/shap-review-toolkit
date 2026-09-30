@@ -11,18 +11,21 @@ from .semantic import compare_shap_contract
 def _fingerprint(backend):
     """Parent-process metadata retained for compatibility; subprocess metadata is authoritative."""
     fp = {"backend": backend, "python": sys.version, "platform": platform.platform()}
+
     try:
         import shap
 
         fp["shap_version"] = shap.__version__
-    except Exception:
+    except (AttributeError, ImportError):
         fp["shap_version"] = None
+
     try:
         import numpy as np
 
         fp["numpy_version"] = np.__version__
-    except Exception:
+    except (AttributeError, ImportError):
         fp["numpy_version"] = None
+
     fp["cuda_visible_devices"] = os.environ.get("CUDA_VISIBLE_DEVICES")
     return fp
 

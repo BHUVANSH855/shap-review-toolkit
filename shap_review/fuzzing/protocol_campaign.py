@@ -53,13 +53,16 @@ class ProtocolCampaign:
                         )
                     self._trigger(obj, case["protocol"])
                 executed = True
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - campaign records arbitrary target failures
                 raised = {
                     "type": type(exc).__name__,
                     "message": str(exc),
                     "traceback": traceback.format_exc(limit=8),
                 }
-            protocol_events = [e for e in obj.events if e.split(":", 1)[0] in PROTOCOLS]
+
+            protocol_events = [
+                e for e in obj.events if e.split(":", 1)[0] in PROTOCOLS
+            ]
             results.append(
                 {
                     "iteration": i,
@@ -85,11 +88,13 @@ class ProtocolCampaign:
                     "child_execution_id": obj.state.get("child_execution_id"),
                 }
             )
+
         harness_observed = {
             e.split(":", 1)[0]
             for r in results
             for e in r["protocol_events"]
-            if e.split(":", 1)[1] == "harness" and e.split(":", 1)[0] in PROTOCOLS
+            if e.split(":", 1)[1] == "harness"
+            and e.split(":", 1)[0] in PROTOCOLS
         }
         shap_observed = {
             e.split(":")[1]
@@ -111,6 +116,7 @@ class ProtocolCampaign:
             if not target_callable
             else (target_observed | shap_observed)
         )
+
         natural_reentry = sum(
             bool(
                 r["reentered"]
@@ -121,10 +127,16 @@ class ProtocolCampaign:
             )
             for r in results
         )
-        requested_mutations = sum(r["case"]["mutation"] != "none" for r in results)
-        observed_mutations = sum(
-            1 for r in results for m in r["mutation_events"] if m.get("changed")
+        requested_mutations = sum(
+            r["case"]["mutation"] != "none" for r in results
         )
+        observed_mutations = sum(
+            1
+            for r in results
+            for m in r["mutation_events"]
+            if m.get("changed")
+        )
+
         scenario_stats = {}
         for scenario in scenarios:
             subset = [r for r in results if r["case"]["scenario"] == scenario]
@@ -142,39 +154,59 @@ class ProtocolCampaign:
                     100 * len(obs & set(PROTOCOLS)) / len(PROTOCOLS), 1
                 ),
             }
+
         for r in results:
             r["scenario_boundary"] = (
-                (getattr(target_callable, "__shap_scenario__", {}) or {}).get(
-                    r["case"]["scenario"]
-                )
+                (
+                    getattr(target_callable, "__shap_scenario__", {}) or {}
+                ).get(r["case"]["scenario"])
                 if target_callable
                 else r["case"]["scenario"]
             )
+
         return {
             "mode": "real-target" if target_callable else "harness-self-test",
             "seed": self.seed,
             "iterations": iterations,
             "scenarios": list(scenarios),
-            "executed": sum(bool(r["executed"] or r["exception"]) for r in results),
+            "executed": sum(
+                bool(r["executed"] or r["exception"]) for r in results
+            ),
             "protocols_declared": list(PROTOCOLS),
             "harness_triggered_protocols": sorted(harness_observed),
             "target_observed_protocols": sorted(target_observed),
             "shap_observed_protocols": sorted(shap_observed),
             "protocols_observed": sorted(compatibility_observed),
-            "protocol_coverage": {p: p in compatibility_observed for p in PROTOCOLS},
+            "protocol_coverage": {
+                p: p in compatibility_observed for p in PROTOCOLS
+            },
             "coverage_percent": round(
-                100 * len(compatibility_observed & set(PROTOCOLS)) / len(PROTOCOLS), 1
+                100
+                * len(compatibility_observed & set(PROTOCOLS))
+                / len(PROTOCOLS),
+                1,
             ),
             "harness_coverage_percent": round(
-                100 * len(harness_observed & set(PROTOCOLS)) / len(PROTOCOLS), 1
+                100
+                * len(harness_observed & set(PROTOCOLS))
+                / len(PROTOCOLS),
+                1,
             ),
             "target_observed_coverage_percent": round(
-                100 * len(target_observed & set(PROTOCOLS)) / len(PROTOCOLS), 1
+                100
+                * len(target_observed & set(PROTOCOLS))
+                / len(PROTOCOLS),
+                1,
             ),
             "shap_observed_coverage_percent": round(
-                100 * len(shap_observed & set(PROTOCOLS)) / len(PROTOCOLS), 1
+                100
+                * len(shap_observed & set(PROTOCOLS))
+                / len(PROTOCOLS),
+                1,
             ),
-            "reentry_requested": sum(bool(r["case"]["reentry"]) for r in results),
+            "reentry_requested": sum(
+                bool(r["case"]["reentry"]) for r in results
+            ),
             "reentry_observed": sum(r["reentered"] for r in results),
             "harness_reentry_observed": sum(
                 bool(
@@ -188,22 +220,25 @@ class ProtocolCampaign:
             ),
             "natural_shap_reentry_observed": natural_reentry,
             "exact_shap_call_provenance": any(
-                e.get("causal_to_active_shap_call")
-                for r in results
-                for e in r.get("mutation_events", [])
-            )
-            if False
-            else any(
-                ev.get("shap_call_id") and ev.get("causal_to_active_shap_call")
+                ev.get("shap_call_id")
+                and ev.get("causal_to_active_shap_call")
                 for r in results
                 for ev in r.get("protocol_events_detail", [])
             ),
             "mutation_requested": requested_mutations,
             "mutation_observed": observed_mutations,
-            "mutation_events": sum(len(r["mutation_events"]) for r in results),
+            "mutation_events": sum(
+                len(r["mutation_events"]) for r in results
+            ),
             "scenario_stats": scenario_stats,
             "results": results,
-            "evidence_policy": "shap_observed requires a runtime stack containing SHAP while the protocol callback executes; harness phase alone cannot establish SHAP causality. Natural re-entry requires the protocol callback itself to invoke the re-entry target while a SHAP frame is active.",
+            "evidence_policy": (
+                "shap_observed requires a runtime stack containing SHAP while "
+                "the protocol callback executes; harness phase alone cannot "
+                "establish SHAP causality. Natural re-entry requires the "
+                "protocol callback itself to invoke the re-entry target while "
+                "a SHAP frame is active."
+            ),
         }
 
     @staticmethod
@@ -257,6 +292,7 @@ def make_treeexplainer_protocol_target(model, background=None):
         ctx = next_execution()
         obj.state["outer_execution_id"] = ctx["execution_id"]
         obj.events.append(f"execution:{ctx['execution_id']}")
+
         # No harness-side protocol touch here. The only path to natural re-entry is
         # a protocol callback invoked from inside SHAP itself.
         obj.set_phase("shap")
@@ -266,15 +302,27 @@ def make_treeexplainer_protocol_target(model, background=None):
             arr = np.asarray(obj)
             obj.events.append("boundary:np.asarray")
             obj.set_phase("shap")
-            return invoke(obj, lambda: explainer.shap_values(arr), ctx["execution_id"])
+            return invoke(
+                obj,
+                lambda: explainer.shap_values(arr),
+                ctx["execution_id"],
+            )
         if scenario == "indexing":
             obj.set_phase("scenario")
             obj.events.append("scenario-boundary:indexing")
             _ = obj[0]
             obj.events.append("boundary:__getitem__")
             obj.set_phase("shap")
-            return invoke(obj, lambda: explainer.shap_values(obj), ctx["execution_id"])
-        return invoke(obj, lambda: explainer.shap_values(obj), ctx["execution_id"])
+            return invoke(
+                obj,
+                lambda: explainer.shap_values(obj),
+                ctx["execution_id"],
+            )
+        return invoke(
+            obj,
+            lambda: explainer.shap_values(obj),
+            ctx["execution_id"],
+        )
 
     def reenter(obj):
         depth = int(obj.state.get("reentry_depth", 0))
@@ -290,7 +338,8 @@ def make_treeexplainer_protocol_target(model, background=None):
             return invoke(
                 obj,
                 lambda: explainer.shap_values(
-                    np.array([[0.5, 0.5]], dtype=float), check_additivity=False
+                    np.array([[0.5, 0.5]], dtype=float),
+                    check_additivity=False,
                 ),
                 child["execution_id"],
             )
@@ -300,7 +349,10 @@ def make_treeexplainer_protocol_target(model, background=None):
     target.__shap_boundary__ = "TreeExplainer.shap_values"
     target.__shap_reentry__ = reenter
     target.__shap_scenario__ = {
-        "shape-dtype": "TreeExplainer.shap_values directly consumes ProtocolObject; shape/dtype protocol boundary",
+        "shape-dtype": (
+            "TreeExplainer.shap_values directly consumes ProtocolObject; "
+            "shape/dtype protocol boundary"
+        ),
         "array-coercion": "np.asarray(obj) occurs before TreeExplainer",
         "indexing": "obj[0] occurs before TreeExplainer",
     }
@@ -312,7 +364,9 @@ def make_default_treeexplainer_protocol_target():
     from sklearn.tree import DecisionTreeRegressor
 
     model = DecisionTreeRegressor(max_depth=2, random_state=0).fit(
-        np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]),
+        np.array(
+            [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]
+        ),
         np.array([0.0, 1.0, 2.0, 3.0]),
     )
     return make_treeexplainer_protocol_target(model)

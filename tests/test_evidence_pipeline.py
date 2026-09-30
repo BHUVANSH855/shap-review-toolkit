@@ -838,7 +838,7 @@ def test_evidence_corpus_warns_on_json_decode_error(tmp_path, caplog):
     bad.write_text("{ not valid json }", encoding="utf-8")
 
     with caplog.at_level(logging.WARNING, logger="shap_review.evidence.corpus"):
-        corpus = EvidenceCorpus.from_directory(tmp_path)
+        EvidenceCorpus.from_directory(tmp_path)
 
     assert any(
         "SHAP-EVID-8888" in r.message or "parse" in r.message.lower()

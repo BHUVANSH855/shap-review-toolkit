@@ -85,11 +85,11 @@ def analyze_native_file(root, path):
             before = "\n".join(lines[lo:i])
             after = "\n".join(lines[i:hi])
             validation = tuple(
-                sorted(set(m.group(0).lower() for m in _VALID.finditer(context)))
+                sorted({m.group(0).lower() for m in _VALID.finditer(context)})
             )
-            ownership = tuple(sorted(set(m.group(0) for m in _OWN.finditer(context))))
-            exception = tuple(sorted(set(m.group(0) for m in _EXC.finditer(context))))
-            reentry = tuple(sorted(set(m.group(0) for m in _REENTRY.finditer(context))))
+            ownership = tuple(sorted({m.group(0) for m in _OWN.finditer(context)}))
+            exception = tuple(sorted({m.group(0) for m in _EXC.finditer(context)}))
+            reentry = tuple(sorted({m.group(0) for m in _REENTRY.finditer(context)}))
             flow = []
             if _VALID.search(before):
                 flow.append("validation-before-boundary")

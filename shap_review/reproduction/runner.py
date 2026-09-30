@@ -27,6 +27,7 @@ def run_script(
             timeout=timeout,
             env=merged_env,
             cwd=cwd,
+            check=False,
         )
         return {
             "returncode": p.returncode,

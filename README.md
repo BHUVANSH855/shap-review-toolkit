@@ -42,7 +42,7 @@ The strongest runtime surface is **TreeExplainer**, including:
 - API-era analysis
 - provenance-aware evidence and finding promotion
 
-Optional integrations include scikit-learn, XGBoost, LightGBM, CatBoost, NumPy, pandas, SciPy, and SHAP itself.
+The supported SHAP ecosystem includes scikit-learn, XGBoost, LightGBM, CatBoost, NumPy, pandas, SciPy, and SHAP itself. These are first-class integration targets of the toolkit. Individual runtime campaigns require the corresponding packages to be available in the execution environment.
 
 ## Evidence model
 
@@ -103,7 +103,7 @@ The toolkit produces evidence and structured triage; static analysis alone does 
 
 Native C/C++/nanobind/CUDA analysis is structured triage rather than a compiler-grade memory-safety proof.
 
-Unavailable optional dependencies or unsupported execution environments are reported explicitly rather than treated as successful validation.
+Unavailable supported integrations or unsupported execution environments are reported explicitly rather than treated as successful validation. A supported integration being unavailable in the current environment does not make that integration unsupported by the toolkit.
 
 ## Documentation
 

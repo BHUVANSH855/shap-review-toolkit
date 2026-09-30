@@ -48,14 +48,14 @@ def normalize_shap_result(value: Any) -> Any:
                 arrays = [np.asarray(x) for x in value]
                 if len({a.shape for a in arrays}) == 1:
                     return np.stack(arrays, axis=-1).tolist()
-            except Exception:
-                pass
+            except (TypeError, ValueError):
+                return [normalize_shap_result(v) for v in value]
         return [normalize_shap_result(v) for v in value]
     if hasattr(value, "tolist") and not isinstance(value, (str, bytes)):
         try:
             return value.tolist()
-        except Exception:
-            pass
+        except (AttributeError, TypeError, ValueError):
+            return value
     if isinstance(value, dict):
         return {
             str(k): normalize_shap_result(v)
@@ -68,7 +68,7 @@ def normalize_shap_result(value: Any) -> Any:
 def _as_array(value):
     try:
         return np.asarray(value, dtype=float)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 

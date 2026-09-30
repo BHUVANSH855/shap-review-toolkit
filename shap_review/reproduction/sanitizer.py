@@ -46,6 +46,7 @@ def run_sanitized(
             capture_output=True,
             text=True,
             timeout=timeout,
+            check=False,
         )
         combined = (p.stdout or "") + "\n" + (p.stderr or "")
         pattern = SANITIZER_PATTERNS.get(kind.lower())

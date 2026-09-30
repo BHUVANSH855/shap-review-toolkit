@@ -194,15 +194,7 @@ def scan_api_era(source: str) -> list[dict]:
                 continue
             elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
                 value = node.value
-                targets = (
-                    node.targets
-                    if isinstance(node, ast.Assign)
-                    else (
-                        [node.target]
-                        if isinstance(node, ast.AnnAssign)
-                        else [node.target]
-                    )
-                )
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
                 state = "NON_SHAP"
                 if isinstance(value, ast.Call):
                     state = ctor_state(value.func, scope)

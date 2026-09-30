@@ -34,11 +34,11 @@ def dtype_tolerance(dtype) -> float:
     """
     if dtype is None:
         return _DEFAULT_TOLERANCE
+
     name = getattr(dtype, "name", str(dtype))
-    for key in _DTYPE_TOLERANCE:
-        if key in name:
-            return _DTYPE_TOLERANCE[key]
-    return _DEFAULT_TOLERANCE
+    name = str(name).strip().lower()
+
+    return _DTYPE_TOLERANCE.get(name, _DEFAULT_TOLERANCE)
 
 
 @dataclass(frozen=True)
@@ -69,9 +69,16 @@ class SHAPContract:
     axis_spec: SHAPAxisSpec | None = None
 
     def resolved_tolerance(self, dtype=None) -> float:
-        """Return effective tolerance, applying dtype-adaptive defaults when tolerance is None."""
+        """Return the effective numerical tolerance for this contract.
+
+        Explicit tolerances must be non-negative. When no tolerance is
+        supplied, the value is derived from the values dtype.
+        """
         if self.tolerance is not None:
+            if self.tolerance < 0:
+                raise ValueError("tolerance must be non-negative")
             return self.tolerance
+
         return dtype_tolerance(dtype)
 
     def to_dict(self):
@@ -104,7 +111,26 @@ def validate_contract(
     # tolerance_source correctly reflects the original caller intent.
     original_tolerance = contract.tolerance
     inferred_dtype = getattr(v, "dtype", None)
-    effective_tolerance = contract.resolved_tolerance(inferred_dtype)
+
+    try:
+        effective_tolerance = contract.resolved_tolerance(inferred_dtype)
+    except ValueError as exc:
+        return {
+            "values_shape": list(v.shape),
+            "base_values_shape": None if b is None else list(b.shape),
+            "target_shape": None if t is None else list(t.shape),
+            "contract": contract.to_dict(),
+            "dtype": str(v.dtype),
+            "effective_tolerance": None,
+            "tolerance_source": (
+                "caller_supplied"
+                if original_tolerance is not None
+                else "dtype_adaptive"
+            ),
+            "valid": False,
+            "error": str(exc),
+        }
+
     if original_tolerance is None and effective_tolerance != _DEFAULT_TOLERANCE:
         contract = dataclasses.replace(contract, tolerance=effective_tolerance)
 

@@ -1,3 +1,5 @@
+import pytest
+
 from shap_review.invariants.evaluator import numeric_additivity, shape_equal
 
 
@@ -807,7 +809,6 @@ def test_oracle_registry_snapshot_isolates_from_later_mutations():
             return OracleResult("StubOracle", True, True, "stub")
 
     oracle = SHAPSemanticOracle()
-    snapshot_keys = set(oracle.registry.keys())
 
     # Mutate the global registry AFTER construction.
     register_oracle("__test_stub__", StubOracle())
@@ -861,3 +862,37 @@ def test_interaction_oracle_asymmetric_same_ndim_is_also_inconclusive():
     # INCONCLUSIVE regardless of symmetry when ndims match.
     assert result.passed is None
     assert result.status == OracleStatus.INCONCLUSIVE
+
+def test_axis_spec_rejects_class_axis_overlapping_interaction_axis():
+    from shap_review.contracts.tensor import SHAPAxisSpec
+
+    spec = SHAPAxisSpec(
+        output_axis=3,
+        class_axis=1,
+        interaction_feature_axes=(1, 2),
+    )
+
+    with pytest.raises(ValueError, match="class_axis cannot overlap"):
+        spec.normalize(4)
+
+
+def test_axis_spec_rejects_class_axis_overlapping_sample_axis():
+    from shap_review.contracts.tensor import SHAPAxisSpec
+
+    spec = SHAPAxisSpec(
+        class_axis=0,
+    )
+
+    with pytest.raises(
+        ValueError, match="class_axis must be distinct from sample_axis"
+    ):
+        spec.normalize(3)
+
+
+def test_infer_axis_spec_rejects_rank_two_interaction_tensor():
+    import numpy as np
+
+    from shap_review.contracts.tensor import infer_axis_spec
+
+    with pytest.raises(ValueError, match="interaction tensors must have rank 3 or 4"):
+        infer_axis_spec(np.zeros((2, 3)), interaction=True)

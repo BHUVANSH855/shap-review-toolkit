@@ -1,12 +1,10 @@
-from .comparator import compare
-from .runner import differential_scripts, run_json_script
+from .runner import compare, differential_scripts
 from .semantic import normalize_shap_result
+from .versions import differential_versions
 
 __all__ = [
     "compare",
     "differential_scripts",
+    "differential_versions",
     "normalize_shap_result",
-    "run_json_script",
 ]
-
-from .versions import differential_versions

@@ -53,6 +53,7 @@ print(json.dumps({'value':value,'stdout':out[-20000:],'parse_error':parse_error,
                 text=True,
                 timeout=timeout,
                 env=proc_env,
+                check=False,
             )
             payload = json.loads(p.stdout) if p.stdout else {}
             return {
@@ -68,12 +69,14 @@ print(json.dumps({'value':value,'stdout':out[-20000:],'parse_error':parse_error,
                 "parse_error": payload.get("parse_error"),
                 "execution_error": payload.get("error"),
             }
+
         p = subprocess.run(
             [executable, str(script)],
             capture_output=True,
             text=True,
             timeout=timeout,
             env=proc_env,
+            check=False,
         )
     except subprocess.TimeoutExpired:
         return {
@@ -86,6 +89,7 @@ print(json.dumps({'value':value,'stdout':out[-20000:],'parse_error':parse_error,
             "execution_reason": "TIMEOUT",
             "semantic_status": "NOT_EVALUATED",
         }
+
     r = {
         "ok": p.returncode == 0,
         "timeout": False,
@@ -112,6 +116,7 @@ def differential_scripts(
     left = run_json_script(reference, timeout, capture_environment=True)
     right = run_json_script(candidate, timeout, capture_environment=True)
     out = {"reference": left, "candidate": right, "equal": None}
+
     if left.get("timeout") or right.get("timeout"):
         out.update(
             {
@@ -125,6 +130,7 @@ def differential_scripts(
             }
         )
         return out
+
     if not left.get("ok") or not right.get("ok"):
         out.update(
             {
@@ -138,13 +144,19 @@ def differential_scripts(
             }
         )
         return out
+
     lv = normalize_shap_result(left["value"]) if semantic else left["value"]
     rv = normalize_shap_result(right["value"]) if semantic else right["value"]
+
     out["comparison"] = compare(lv, rv, rtol=rtol, atol=atol)
     out["contract_comparison"] = compare_shap_contract(
         left["value"], right["value"], rtol=rtol, atol=atol
     )
-    agree = bool(out["comparison"]["equal"] and out["contract_comparison"]["equal"])
+
+    agree = bool(
+        out["comparison"]["equal"] and out["contract_comparison"]["equal"]
+    )
+
     out.update(
         {
             "equal": agree,
@@ -155,8 +167,13 @@ def differential_scripts(
             "semantic_status": "NOT_EVALUATED" if agree else "INCONCLUSIVE",
             "semantic_disagreement": out["comparison"]["equal"]
             != out["contract_comparison"]["equal"],
-            "comparison_reason": "differential agreement does not establish correctness",
-            "semantic_note": "MATCH means reference and candidate agree; it is not a correctness proof",
+            "comparison_reason": (
+                "differential agreement does not establish correctness"
+            ),
+            "semantic_note": (
+                "MATCH means reference and candidate agree; "
+                "it is not a correctness proof"
+            ),
         }
     )
     return out

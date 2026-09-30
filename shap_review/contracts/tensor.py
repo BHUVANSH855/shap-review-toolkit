@@ -34,10 +34,12 @@ class SHAPAxisSpec:
         class_axis = None if self.class_axis is None else n(self.class_axis)
         if sample == feature:
             raise ValueError("sample_axis and feature_axis must be distinct")
+
         if output is not None and output in {sample, feature}:
             raise ValueError(
                 "output_axis must be distinct from sample_axis and feature_axis"
             )
+
         if pair is not None:
             if len(pair) != 2 or pair[0] == pair[1]:
                 raise ValueError("interaction_feature_axes requires two distinct axes")
@@ -45,13 +47,20 @@ class SHAPAxisSpec:
                 raise ValueError("interaction feature axes cannot include sample_axis")
             if output is not None and output in pair:
                 raise ValueError("interaction feature axes cannot include output_axis")
-        if class_axis is not None and (
-            class_axis in {sample, feature}
-            or (output is not None and class_axis != output)
-        ):
-            raise ValueError(
-                "class_axis must be distinct from sample/feature and align with output_axis"
-            )
+            if class_axis is not None and class_axis in pair:
+                raise ValueError(
+                    "class_axis cannot overlap interaction feature axes"
+                )
+
+        if class_axis is not None:
+            if class_axis in {sample, feature}:
+                raise ValueError(
+                    "class_axis must be distinct from sample_axis and feature_axis"
+                )
+            if output is not None and class_axis != output:
+                raise ValueError(
+                    "class_axis must align with output_axis when output_axis is set"
+                )
         return SHAPAxisSpec(
             sample_axis=sample,
             feature_axis=feature,
@@ -171,11 +180,33 @@ def _project_axes_after_reduction(
             )
         return axis - sum(1 for r in removed if r < axis)
 
+    projected_sample = project(axes.sample_axis)
+    projected_output = project(axes.output_axis)
+    projected_class = project(axes.class_axis)
+
+    # The feature axis no longer exists after contribution reduction.
+    # Keep a deterministic placeholder that cannot collide with any
+    # remaining semantic axis.
+    remaining_axes = {
+        axis
+        for axis in (
+            projected_sample,
+            projected_output,
+            projected_class,
+        )
+        if axis is not None
+    }
+
+    projected_feature = next(
+        (axis for axis in range(len(remaining_axes) + 1) if axis not in remaining_axes),
+        0,
+    )
+
     return SHAPAxisSpec(
-        sample_axis=project(axes.sample_axis) or 0,
-        feature_axis=0,
-        output_axis=project(axes.output_axis),
-        class_axis=project(axes.class_axis),
+        sample_axis=projected_sample if projected_sample is not None else 0,
+        feature_axis=projected_feature,
+        output_axis=projected_output,
+        class_axis=projected_class,
         interaction_feature_axes=None,
     )
 
@@ -414,20 +445,37 @@ def infer_axis_spec(
     values: np.ndarray, *, interaction: bool = False, class_axis: int | None = None
 ) -> SHAPAxisSpec:
     ndim = values.ndim
+
     if ndim == 2:
+        if interaction:
+            raise ValueError(
+                "interaction tensors must have rank 3 or 4; provide axis_spec "
+                "for a non-canonical representation"
+            )
         return SHAPAxisSpec()
+
     if interaction:
         if ndim == 3:
             return SHAPAxisSpec(interaction_feature_axes=(1, 2))
+
         if ndim == 4:
-            return SHAPAxisSpec(output_axis=3, interaction_feature_axes=(1, 2))
+            return SHAPAxisSpec(
+                output_axis=3,
+                interaction_feature_axes=(1, 2),
+            )
+
         raise ValueError(
-            f"unsupported canonical interaction tensor rank: {ndim}; provide axis_spec"
+            f"unsupported canonical interaction tensor rank: {ndim}; "
+            "provide axis_spec"
         )
+
     if ndim == 3:
+        resolved_class_axis = 2 if class_axis is None else class_axis
         return SHAPAxisSpec(
-            output_axis=2, class_axis=class_axis if class_axis is not None else 2
+            output_axis=2,
+            class_axis=resolved_class_axis,
         )
+
     raise ValueError(
         f"unsupported canonical SHAP tensor rank: {ndim}; provide axis_spec"
     )

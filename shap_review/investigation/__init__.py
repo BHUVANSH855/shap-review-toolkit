@@ -1,1 +1,1 @@
-from .planner import plan
+from .planner import plan as plan

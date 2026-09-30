@@ -14,23 +14,43 @@ class OracleResult:
 def numeric_additivity(
     values, base_values, model_output, rtol=1e-2, atol=1e-6
 ) -> OracleResult:
-    """Check additivity: base_values + sum_over_features(values) == model_output.
+    """Check SHAP additivity using the canonical semantic tensor path.
 
-    Uses the canonical SHAPSemanticTensor / contracts/tensor.py path so that
-    multiclass (3-D) and interaction (4-D) tensors reduce over the correct
-    feature axis rather than blindly summing axis=-1 (which sums the *class*
-    axis for 3-D tensors and silently produces a wrong result).
+    The reconstruction is delegated to SHAPSemanticTensor so that feature
+    reduction remains aware of multiclass and interaction tensor layouts.
+
+    Invalid tolerance values are rejected explicitly rather than being passed
+    through to NumPy, where the resulting error would be less specific.
     """
     import numpy as np
 
     from shap_review.contracts.tensor import SHAPSemanticTensor
 
+    if rtol < 0 or atol < 0:
+        return OracleResult(
+            False,
+            "additivity check failed: tolerances must be non-negative",
+            {"rtol": rtol, "atol": atol},
+        )
+
     try:
         tensor = SHAPSemanticTensor.from_values(values, base_values=base_values)
         reconstructed = np.asarray(tensor.reconstruction())
         rhs = np.asarray(model_output, dtype=float)
-        ok = np.allclose(reconstructed, rhs, rtol=rtol, atol=atol, equal_nan=False)
-        err = float(np.max(np.abs(reconstructed - rhs))) if reconstructed.size else 0.0
+
+        ok = np.allclose(
+            reconstructed,
+            rhs,
+            rtol=rtol,
+            atol=atol,
+            equal_nan=False,
+        )
+        err = (
+            float(np.max(np.abs(reconstructed - rhs)))
+            if reconstructed.size
+            else 0.0
+        )
+
         return OracleResult(
             bool(ok),
             "additivity holds"

@@ -211,7 +211,7 @@ class SemanticIRBuilder:
     def _expr(node):
         try:
             return ast.unparse(node)
-        except Exception:
+        except (AttributeError, TypeError):
             return type(node).__name__
 
     @staticmethod

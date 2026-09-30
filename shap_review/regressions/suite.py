@@ -33,7 +33,7 @@ def run_4911():
         model = RandomForestRegressor(random_state=0).fit(X.fillna(0), y)
         try:
             shap.TreeExplainer(model, data=X)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             exc_type = type(exc).__name__
             exc_msg = str(exc).lower()
             # Only mark as reproduced when the exception is clearly caused by the
@@ -77,7 +77,7 @@ def run_4911():
             "constructor succeeded — nullable dtype was handled without error",
             {"shap_version": shap.__version__},
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return RegressionResult(
             "SHAP-4911",
             "blocked",
@@ -101,7 +101,7 @@ def run_4495():
         explainer = shap.TreeExplainer(model)
         before = np.asarray(explainer.expected_value).copy()
         before_shape = before.shape
-        values = explainer.shap_values(X[150:])
+        explainer.shap_values(X[150:])
         after = np.asarray(explainer.expected_value).copy()
         after_shape = after.shape
         changed = not np.array_equal(before, after) or before_shape != after_shape
@@ -113,7 +113,7 @@ def run_4495():
             f"before={before.tolist()} shape={before_shape}; after={after.tolist()} shape={after_shape}",
             {"shap_version": shap.__version__},
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return RegressionResult(
             "SHAP-4495",
             "blocked",
@@ -148,7 +148,7 @@ def run_5098():
                 "tree_ensemble_available": has_tree_ensemble,
             },
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return RegressionResult(
             "SHAP-5098",
             "blocked",
@@ -201,7 +201,7 @@ def run_catboost_interventional():
                 "cross_version_required": True,
             },
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return RegressionResult(
             "SHAP-CATBOOST-INTERVENTIONAL-RECON",
             "blocked",
@@ -248,7 +248,7 @@ def _pkg_version(name):
         from importlib.metadata import version
 
         return version(name)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 

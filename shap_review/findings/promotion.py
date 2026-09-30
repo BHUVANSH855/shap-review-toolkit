@@ -19,15 +19,16 @@ class PromotionPolicy:
         from .lifecycle import transition
 
         transition(current, target)
-        verdict = chain.verdict() if chain is not None else "UNVALIDATED"
+
         if self.require_inconclusive_block and target in {
             FindingStatus.CONFIRMED,
             FindingStatus.REPORTED,
         }:
             if chain is None:
                 raise ValueError("promotion blocked: no evidence chain supplied")
+
             # Only gate on items that are REQUIRED (policy_required or
-            # contract_required).  Non-required items (e.g. historical issue
+            # contract_required). Non-required items (e.g. historical issue
             # refs with passed=None) must not block promotion when all required
             # runtime oracles have passed.
             inconclusive_required = [
@@ -44,22 +45,31 @@ class PromotionPolicy:
                 raise ValueError(
                     f"promotion blocked by inconclusive required oracle results: {names}"
                 )
-        if target == FindingStatus.REPRODUCED and self.require_dynamic_for_reproduced:
-            if chain is None or not any(
-                i.passed is True and i.kind.value in {"dynamic", "reproduction"}
-                for i in chain.independent_items()
-            ):
-                raise ValueError(
-                    "REPRODUCED requires positive independent dynamic/reproduction evidence"
+
+        if (
+            target == FindingStatus.REPRODUCED
+            and self.require_dynamic_for_reproduced
+            and (
+                chain is None
+                or not any(
+                    i.passed is True and i.kind.value in {"dynamic", "reproduction"}
+                    for i in chain.independent_items()
                 )
+            )
+        ):
+            raise ValueError(
+                "REPRODUCED requires positive independent dynamic/reproduction evidence"
+            )
+
         if (
             target == FindingStatus.EVIDENCE_VALID
             and self.require_independent_for_evidence_valid
+            and (chain is None or chain.independent_kinds() < 2)
         ):
-            if chain is None or chain.independent_kinds() < 2:
-                raise ValueError(
-                    "EVIDENCE_VALID requires at least two independent evidence kinds"
-                )
+            raise ValueError(
+                "EVIDENCE_VALID requires at least two independent evidence kinds"
+            )
+
         if (
             target == FindingStatus.CONFIRMED
             and self.require_runtime_or_differential_for_confirmed
@@ -78,7 +88,7 @@ class PromotionPolicy:
                         or (
                             # Differential evidence qualifies ONLY when the reference
                             # correctness is established — not merely when two executions
-                            # agree.  reference_correctness=UNKNOWN means we only know
+                            # agree. reference_correctness=UNKNOWN means we only know
                             # they matched, not that either is correct.
                             i.kind.value == "differential"
                             and i.details.get("reference_correctness")
@@ -95,6 +105,7 @@ class PromotionPolicy:
                     "or differential evidence with established reference correctness "
                     "(differential agreement with reference_correctness=UNKNOWN is not sufficient)"
                 )
+
         if (
             target == FindingStatus.REPORTED
             and self.require_reproducer_for_reported

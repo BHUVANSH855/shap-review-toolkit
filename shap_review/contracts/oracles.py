@@ -232,11 +232,6 @@ class OutputSpaceOracle:
                             "log_loss requires predict_proba",
                         )
                     probs = np.asarray(model.predict_proba(inputs), dtype=float)
-                    labels = (
-                        np.asarray(getattr(inputs, "y", None))
-                        if hasattr(inputs, "y")
-                        else None
-                    )
                     return OracleResult(
                         "OutputSpaceOracle",
                         False,
@@ -329,7 +324,7 @@ class OutputSpaceOracle:
                     "broadcast": broadcast_details,
                 },
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - oracle converts runtime failures into structured results
             return OracleResult(
                 "OutputSpaceOracle",
                 False,
@@ -616,7 +611,7 @@ class AdditivityOracle:
                     "broadcast": broadcast_details,
                 },
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - oracle converts runtime failures into structured results
             return OracleResult(
                 "AdditivityOracle",
                 False,
@@ -662,7 +657,7 @@ class InputMutationOracle:
                 expected={"all_changed_flags": False},
                 details=details,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - oracle converts runtime failures into structured results
             return OracleResult(
                 "InputMutationOracle",
                 False,
@@ -735,36 +730,42 @@ class SHAPSemanticOracle:
             ),
         }
         args = {
-            "ShapeOracle": dict(values=values, expected_shape=contract.values_shape),
-            "ExpectedValueOracle": dict(
-                base_values=base_values,
-                expected_value=expected_value,
-                tolerance=contract.tolerance,
-                semantics=contract.expected_value_semantics,
-            ),
-            "InteractionOracle": dict(
-                values=values,
-                interaction_values=interaction_values,
-                axes=getattr(contract, "axis_spec", None),
-            ),
-            "AdditivityOracle": dict(
-                values=values,
-                base_values=base_values,
-                model_output=model_output,
-                contract=contract,
-                required_override=True,
-            ),
-            "OutputSpaceOracle": dict(
-                contract=contract,
-                shap_values=values,
-                base_values=base_values,
-                model_output=model_output,
-                model=model,
-                inputs=inputs,
-                target_source=target_source,
-                independent_target=independent_target,
-            ),
-            "InputMutationOracle": dict(before=mutation_before, after=mutation_after),
+            "ShapeOracle": {
+                "values": values,
+                "expected_shape": contract.values_shape,
+            },
+            "ExpectedValueOracle": {
+                "base_values": base_values,
+                "expected_value": expected_value,
+                "tolerance": contract.tolerance,
+                "semantics": contract.expected_value_semantics,
+            },
+            "InteractionOracle": {
+                "values": values,
+                "interaction_values": interaction_values,
+                "axes": getattr(contract, "axis_spec", None),
+            },
+            "AdditivityOracle": {
+                "values": values,
+                "base_values": base_values,
+                "model_output": model_output,
+                "contract": contract,
+                "required_override": True,
+            },
+            "OutputSpaceOracle": {
+                "contract": contract,
+                "shap_values": values,
+                "base_values": base_values,
+                "model_output": model_output,
+                "model": model,
+                "inputs": inputs,
+                "target_source": target_source,
+                "independent_target": independent_target,
+            },
+            "InputMutationOracle": {
+                "before": mutation_before,
+                "after": mutation_after,
+            },
         }
         results = []
         for name, (contract_required, policy_required) in req.items():
@@ -858,7 +859,7 @@ def _mutation_dimensions(before, after):
                 "writeable": bool(arr.flags.writeable),
                 "id": id(obj),
             }
-        except Exception:
+        except Exception:  # noqa: BLE001 - introspection must tolerate arbitrary object behavior
             out[name] = {"type": type(obj).__name__, "id": id(obj)}
     return {
         "shape_changed": out["before"].get("shape") != out["after"].get("shape"),
@@ -875,5 +876,5 @@ def _buffer_identity(obj):
     try:
         arr = np.asarray(obj)
         return id(arr.base) if arr.base is not None else id(arr)
-    except Exception:
+    except Exception:  # noqa: BLE001 - array-base introspection must not fail the oracle
         return None
