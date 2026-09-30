@@ -6,6 +6,7 @@ Expected: explainer.model_output == "probability" after construction with
           model_output="probability" on a pre-built TreeEnsemble.
 Observed: model_output may not propagate correctly on affected versions.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -63,26 +64,32 @@ try:
     actual_output = explainer.model_output
     model_output = getattr(explainer.model, "model_output", None)
     reproduced = actual_output != "probability"
-    result.update({
-        "reproduced": reproduced,
-        "status": "reproduced" if reproduced else "not_reproduced",
-        "explainer_model_output": actual_output,
-        "model_model_output": model_output,
-        "note": (
-            "model_output was not propagated correctly"
-            if reproduced
-            else "model_output propagated correctly on this version"
-        ),
-    })
+    result.update(
+        {
+            "reproduced": reproduced,
+            "status": "reproduced" if reproduced else "not_reproduced",
+            "explainer_model_output": actual_output,
+            "model_model_output": model_output,
+            "note": (
+                "model_output was not propagated correctly"
+                if reproduced
+                else "model_output propagated correctly on this version"
+            ),
+        }
+    )
 except ImportError as exc:
-    result.update({
-        "status": "blocked",
-        "note": f"TreeEnsemble API unavailable on this SHAP version: {exc}",
-    })
+    result.update(
+        {
+            "status": "blocked",
+            "note": f"TreeEnsemble API unavailable on this SHAP version: {exc}",
+        }
+    )
 except Exception as exc:  # noqa: BLE001
-    result.update({
-        "status": "blocked",
-        "note": f"{type(exc).__name__}: {exc}",
-    })
+    result.update(
+        {
+            "status": "blocked",
+            "note": f"{type(exc).__name__}: {exc}",
+        }
+    )
 
 print(json.dumps(result, indent=2))

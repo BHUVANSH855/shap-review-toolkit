@@ -20,9 +20,7 @@ SANITIZER_PATTERNS = {
 _ASAN_LIB_PATTERNS = re.compile(
     r"libasan|libclang_rt\.asan|asan_dynamic", re.IGNORECASE
 )
-_UBSAN_LIB_PATTERNS = re.compile(
-    r"libubsan|libclang_rt\.ubsan", re.IGNORECASE
-)
+_UBSAN_LIB_PATTERNS = re.compile(r"libubsan|libclang_rt\.ubsan", re.IGNORECASE)
 
 
 def _linked_libraries(executable: str) -> str:
@@ -37,19 +35,28 @@ def _linked_libraries(executable: str) -> str:
         if system == "Linux" and shutil.which("ldd"):
             result = subprocess.run(
                 ["ldd", executable],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             return result.stdout + result.stderr
         if system == "Darwin" and shutil.which("otool"):
             result = subprocess.run(
                 ["otool", "-L", executable],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             return result.stdout + result.stderr
         if system == "Windows" and shutil.which("dumpbin"):
             result = subprocess.run(
                 ["dumpbin", "/dependents", executable],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             return result.stdout + result.stderr
     except Exception:  # noqa: BLE001, S110
@@ -72,7 +79,9 @@ def detect_instrumentation(kind: str, executable: str | None = None) -> dict:
     # Fast path: sanitizer env vars that instrumented binaries set at startup.
     if kind == "asan":
         lib_pattern = _ASAN_LIB_PATTERNS
-        env_indicator = os.environ.get("ASAN_OPTIONS") or os.environ.get("ASAN_SYMBOLIZER_PATH")
+        env_indicator = os.environ.get("ASAN_OPTIONS") or os.environ.get(
+            "ASAN_SYMBOLIZER_PATH"
+        )
     elif kind == "ubsan":
         lib_pattern = _UBSAN_LIB_PATTERNS
         env_indicator = os.environ.get("UBSAN_OPTIONS")
@@ -248,6 +257,10 @@ def run_sanitized(
             "instrumentation_detection": instrumentation,
             "memory_safety_confirmation": False,
             "memory_safety_note": "Sanitizer execution did not complete within the timeout.",
-            "stdout": (exc.stdout or "")[-30000:] if isinstance(exc.stdout, str) else "",
-            "stderr": (exc.stderr or "")[-30000:] if isinstance(exc.stderr, str) else "",
+            "stdout": (exc.stdout or "")[-30000:]
+            if isinstance(exc.stdout, str)
+            else "",
+            "stderr": (exc.stderr or "")[-30000:]
+            if isinstance(exc.stderr, str)
+            else "",
         }

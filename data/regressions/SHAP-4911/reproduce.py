@@ -6,6 +6,7 @@ object dtype and cannot be cast to float64.
 Expected: SHAP converts nullable dtype or raises a clear, informative error.
 Observed: TypeError from native C extension on affected versions.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -57,11 +58,13 @@ except Exception as exc:  # noqa: BLE001
     is_target = exc_type == "TypeError" and any(
         m in exc_msg for m in nullable_dtype_markers
     )
-    result.update({
-        "reproduced": is_target,
-        "exception_type": exc_type,
-        "exception_message": str(exc),
-        "status": "reproduced" if is_target else "ambiguous",
-    })
+    result.update(
+        {
+            "reproduced": is_target,
+            "exception_type": exc_type,
+            "exception_message": str(exc),
+            "status": "reproduced" if is_target else "ambiguous",
+        }
+    )
 
 print(json.dumps(result, indent=2))

@@ -8,6 +8,7 @@ import numpy as np
 def dependency_available() -> bool:
     try:
         import shap  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -94,6 +95,7 @@ def _build_model(backend: str, case: dict, train, y):
 
     if backend == "xgboost":
         import xgboost as xgb
+
         params = {
             "n_estimators": n_trees,
             "max_depth": depth,
@@ -101,16 +103,19 @@ def _build_model(backend: str, case: dict, train, y):
             "verbosity": 0,
         }
         if classification:
-            model = xgb.XGBClassifier(**params, use_label_encoder=False,
-                                       eval_metric="logloss")
+            model = xgb.XGBClassifier(
+                **params, use_label_encoder=False, eval_metric="logloss"
+            )
         else:
             model = xgb.XGBRegressor(**params)
         import pandas as pd
+
         train_arr = train.values if isinstance(train, pd.DataFrame) else train
         return model.fit(train_arr, y)
 
     if backend == "lightgbm":
         import lightgbm as lgb
+
         params = {
             "n_estimators": n_trees,
             "max_depth": depth,
@@ -122,11 +127,13 @@ def _build_model(backend: str, case: dict, train, y):
         else:
             model = lgb.LGBMRegressor(**params)
         import pandas as pd
+
         train_arr = train.values if isinstance(train, pd.DataFrame) else train
         return model.fit(train_arr, y)
 
     if backend == "catboost":
         from catboost import CatBoostClassifier, CatBoostRegressor
+
         params = {
             "iterations": n_trees,
             "depth": min(depth, 8),
@@ -134,6 +141,7 @@ def _build_model(backend: str, case: dict, train, y):
             "verbose": False,
         }
         import pandas as pd
+
         train_arr = train.values if isinstance(train, pd.DataFrame) else train
         if classification:
             return CatBoostClassifier(**params).fit(train_arr, y)
@@ -142,10 +150,12 @@ def _build_model(backend: str, case: dict, train, y):
     # Default: sklearn RandomForest
     if classification:
         from sklearn.ensemble import RandomForestClassifier
+
         return RandomForestClassifier(
             n_estimators=n_trees, max_depth=depth, random_state=seed
         ).fit(train, y)
     from sklearn.ensemble import RandomForestRegressor
+
     return RandomForestRegressor(
         n_estimators=n_trees, max_depth=depth, random_state=seed
     ).fit(train, y)
@@ -205,8 +215,10 @@ def run_case(case: dict) -> dict:
 
         explainer = shap.TreeExplainer(model, **kwargs)
         import pandas as pd
+
         before = (
-            sample.copy() if isinstance(sample, pd.DataFrame)
+            sample.copy()
+            if isinstance(sample, pd.DataFrame)
             else np.asarray(sample).copy()
         )
 
@@ -234,7 +246,10 @@ def run_case(case: dict) -> dict:
         arr = np.asarray(values)
 
         recon, tensor = _canonical_reconstruction(
-            values, base, interaction=interaction, model_output=model_output,
+            values,
+            base,
+            interaction=interaction,
+            model_output=model_output,
         )
 
         target_for_compare = target
@@ -249,7 +264,8 @@ def run_case(case: dict) -> dict:
         tol = 5e-4 if case.get("dtype") == "float32" else 1e-5
 
         after = (
-            sample.copy() if isinstance(sample, pd.DataFrame)
+            sample.copy()
+            if isinstance(sample, pd.DataFrame)
             else np.asarray(sample).copy()
         )
         if isinstance(before, pd.DataFrame):

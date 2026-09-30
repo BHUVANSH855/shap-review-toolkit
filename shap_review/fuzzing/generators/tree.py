@@ -36,17 +36,19 @@ def generate_tree_case(rng: random.Random) -> dict:
         interaction = False
 
     # Input variant: normal distribution is baseline; add boundary cases.
-    input_variant = rng.choice([
-        "normal",       # standard normal — baseline
-        "normal",       # weighted to appear more often
-        "normal",
-        "zeros",        # all-zero features — edge case for tree splits
-        "zero_variance",# single repeated value per feature
-        "large",        # values scaled to ±1000 — overflow/precision check
-        "int_as_float", # integer values cast to float — dtype edge case
-        "nan_row",      # entire first row is NaN
-        "mixed_nan",    # random NaN scatter
-    ])
+    input_variant = rng.choice(
+        [
+            "normal",  # standard normal — baseline
+            "normal",  # weighted to appear more often
+            "normal",
+            "zeros",  # all-zero features — edge case for tree splits
+            "zero_variance",  # single repeated value per feature
+            "large",  # values scaled to ±1000 — overflow/precision check
+            "int_as_float",  # integer values cast to float — dtype edge case
+            "nan_row",  # entire first row is NaN
+            "mixed_nan",  # random NaN scatter
+        ]
+    )
 
     # DataFrame nullable dtype variant (pandas Int64 — issue #4911).
     nullable_dtype = (

@@ -30,8 +30,8 @@ def _has_ast_assertion(source: str) -> bool:
         "assert_almost_equal",
         "assert_raises",
         "assert_warns",
-        "raises",          # pytest.raises
-        "approx",          # used inside assert ... == approx(...)
+        "raises",  # pytest.raises
+        "approx",  # used inside assert ... == approx(...)
     }
 
     for node in ast.walk(tree):

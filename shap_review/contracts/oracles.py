@@ -612,7 +612,7 @@ class AdditivityOracle:
                         "tree-path conditional expectations"
                         if perturbation == "tree_path_dependent"
                         else f"feature_perturbation={perturbation!r}: verify "
-                             "additivity semantics match the perturbation contract"
+                        "additivity semantics match the perturbation contract"
                     )
                 )
             )

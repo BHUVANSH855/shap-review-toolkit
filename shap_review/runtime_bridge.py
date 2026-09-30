@@ -320,13 +320,18 @@ def _traceback_contains_shap_frame(traceback: str) -> bool:
         if not stripped.startswith("File "):
             continue
         # The path segment is between the first pair of quotes.
-        if '"/shap/' in stripped or "\\shap\\" in stripped or "/site-packages/shap/" in stripped:
+        if (
+            '"/shap/' in stripped
+            or "\\shap\\" in stripped
+            or "/site-packages/shap/" in stripped
+        ):
             return True
         # Editable installs: path contains "shap" as a directory component.
         # Be conservative: require it to be a directory boundary, not a
         # substring of another package name (e.g. "reshap", "shapper").
         import re as _re
-        if _re.search(r'[/\\]shap[/\\]', stripped):
+
+        if _re.search(r"[/\\]shap[/\\]", stripped):
             return True
     return False
 

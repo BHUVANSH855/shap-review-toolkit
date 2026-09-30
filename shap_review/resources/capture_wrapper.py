@@ -1,4 +1,4 @@
-﻿"""Subprocess capture wrapper for differential testing.
+"""Subprocess capture wrapper for differential testing.
 
 Invoked as:
     python capture_wrapper.py <target_script> [environment_depth]
@@ -8,6 +8,7 @@ emits a single JSON object containing the result plus environment metadata.
 This avoids passing a multi-line inline script to python -c, which breaks
 on Windows paths containing backslashes.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -28,6 +29,7 @@ err = None
 try:
     with contextlib.redirect_stdout(buf):
         import runpy
+
         runpy.run_path(script_path, run_name="__main__")
 except SystemExit as exc:
     rc = int(exc.code) if isinstance(exc.code, int) else 0
@@ -56,6 +58,7 @@ envinfo: dict = {
 if environment_depth == "deep":
     try:
         import numpy as _np
+
         envinfo["blas_configuration"] = (
             _np.__config__.get_info("blas_opt_info")
             if hasattr(_np.__config__, "get_info")
@@ -64,8 +67,8 @@ if environment_depth == "deep":
     except Exception:  # noqa: BLE001, S110
         pass
     try:
-        envinfo["openmp_runtime"] = (
-            os.environ.get("OMP_NUM_THREADS") or os.environ.get("OMP_RUNTIME")
+        envinfo["openmp_runtime"] = os.environ.get("OMP_NUM_THREADS") or os.environ.get(
+            "OMP_RUNTIME"
         )
     except Exception:  # noqa: BLE001, S110
         pass
@@ -73,28 +76,44 @@ if environment_depth == "deep":
     envinfo["cuda_runtime"] = os.environ.get("CUDA_PATH")
     envinfo["gpu_model"] = os.environ.get("NVIDIA_VISIBLE_DEVICES")
     envinfo["environment_variables"] = {
-        k: v for k, v in os.environ.items()
-        if k in {
-            "CUDA_VISIBLE_DEVICES", "CUDA_PATH", "OMP_NUM_THREADS",
-            "OMP_RUNTIME", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS",
+        k: v
+        for k, v in os.environ.items()
+        if k
+        in {
+            "CUDA_VISIBLE_DEVICES",
+            "CUDA_PATH",
+            "OMP_NUM_THREADS",
+            "OMP_RUNTIME",
+            "MKL_NUM_THREADS",
+            "OPENBLAS_NUM_THREADS",
             "LD_LIBRARY_PATH",
         }
     }
 
 for pkg in (
-    "shap", "numpy", "scipy", "pandas",
-    "scikit-learn", "xgboost", "lightgbm", "catboost",
+    "shap",
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "xgboost",
+    "lightgbm",
+    "catboost",
 ):
     try:
         envinfo[pkg + "_version"] = importlib.metadata.version(pkg)
     except importlib.metadata.PackageNotFoundError:
         envinfo[pkg + "_version"] = None
 
-print(json.dumps({
-    "value": value,
-    "stdout": out[-20000:],
-    "parse_error": parse_error,
-    "returncode": rc,
-    "error": err,
-    "environment": envinfo,
-}))
+print(
+    json.dumps(
+        {
+            "value": value,
+            "stdout": out[-20000:],
+            "parse_error": parse_error,
+            "returncode": rc,
+            "error": err,
+            "environment": envinfo,
+        }
+    )
+)

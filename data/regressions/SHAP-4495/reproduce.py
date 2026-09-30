@@ -6,6 +6,7 @@ Expected: explainer.expected_value is identical before and after shap_values().
 Observed: expected_value changes shape or value after shap_values() on XGBoost
           classifiers on affected versions.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -39,17 +40,22 @@ after = np.asarray(explainer.expected_value).copy()
 after_shape = list(after.shape)
 changed = not np.array_equal(before, after) or before_shape != after_shape
 
-print(json.dumps({
-    "issue": "SHAP-4495",
-    "environment": {
-        "python": sys.version,
-        "platform": platform.platform(),
-        "packages": _versions(),
-    },
-    "reproduced": changed,
-    "status": "reproduced" if changed else "not_reproduced",
-    "before": before.tolist(),
-    "before_shape": before_shape,
-    "after": after.tolist(),
-    "after_shape": after_shape,
-}, indent=2))
+print(
+    json.dumps(
+        {
+            "issue": "SHAP-4495",
+            "environment": {
+                "python": sys.version,
+                "platform": platform.platform(),
+                "packages": _versions(),
+            },
+            "reproduced": changed,
+            "status": "reproduced" if changed else "not_reproduced",
+            "before": before.tolist(),
+            "before_shape": before_shape,
+            "after": after.tolist(),
+            "after_shape": after_shape,
+        },
+        indent=2,
+    )
+)

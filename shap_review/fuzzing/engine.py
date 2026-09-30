@@ -26,14 +26,18 @@ def _fuzz_worker(queue: multiprocessing.Queue, case: dict) -> None:
         queue.put(run_case(case))
     except Exception as exc:  # noqa: BLE001
         import traceback as _tb
-        queue.put({
-            "executed": True,
-            "failed": True,
-            "exception": type(exc).__name__,
-            "message": str(exc),
-            "traceback": _tb.format_exc(limit=10),
-            "case": case,
-        })
+
+        queue.put(
+            {
+                "executed": True,
+                "failed": True,
+                "exception": type(exc).__name__,
+                "message": str(exc),
+                "traceback": _tb.format_exc(limit=10),
+                "case": case,
+            }
+        )
+
 
 class TreeExplainerFuzzer:
     def __init__(self, seed: int = 0, case_timeout: int = DEFAULT_CASE_TIMEOUT):

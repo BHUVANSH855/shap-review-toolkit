@@ -144,7 +144,11 @@ def run_5098():
     from pathlib import Path as _Path
 
     script = (
-        _Path(__file__).parents[2] / "data" / "regressions" / "SHAP-5098" / "reproduce.py"
+        _Path(__file__).parents[2]
+        / "data"
+        / "regressions"
+        / "SHAP-5098"
+        / "reproduce.py"
     )
 
     if not script.exists():
@@ -174,7 +178,10 @@ def run_5098():
                 False,
                 "pre-built TreeEnsemble must propagate requested model_output",
                 f"reproducer output was not valid JSON: {stdout[:200]}",
-                {"shap_version": _shap.__version__, "returncode": run_result.get("returncode")},
+                {
+                    "shap_version": _shap.__version__,
+                    "returncode": run_result.get("returncode"),
+                },
             )
 
         status = payload.get("status", "blocked")
