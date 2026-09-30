@@ -23,18 +23,17 @@ PY_SUFFIXES = {".py", ".pyi", ".pyx", ".c", ".cc", ".cpp", ".h", ".hpp", ".cu"}
 # Plain substring matching fires on C comments/string literals; word-bounded
 # regex prevents false NativeBoundary entries from commented-out code.
 _NATIVE_PATTERNS: list[tuple] = [
-    (re.compile(r"\bnanobind\b"),          "nanobind",     "binding",            True),
-    (re.compile(r"\bnb::ndarray\b"),       "nanobind",     "ndarray-conversion", True),
-    (re.compile(r"\bnb::object\b"),        "nanobind",     "object-handle",      True),
-    (re.compile(r"\bPyArray_DATA\b"),      "numpy-c-api",  "raw-buffer",         False),
-    (re.compile(r"\bPyArray_GETPTR\w*\b"), "numpy-c-api", "element-access",     False),
-    (re.compile(r"\bPyErr_\w+\b"),        "python-c-api", "exception",          True),
-    (re.compile(r"\bPyList_GET_ITEM\b"),   "python-c-api", "borrowed-item",      True),
-    (re.compile(r"\bcudaMemcpy\w*\b"),    "cuda",         "device-copy",        False),
-    (re.compile(r"\bcudaMalloc\w*\b"),    "cuda",         "allocation",         False),
-    (re.compile(r"\bPyObject_Call\w*\b"), "python-c-api", "python-callback",    True),
+    (re.compile(r"\bnanobind\b"), "nanobind", "binding", True),
+    (re.compile(r"\bnb::ndarray\b"), "nanobind", "ndarray-conversion", True),
+    (re.compile(r"\bnb::object\b"), "nanobind", "object-handle", True),
+    (re.compile(r"\bPyArray_DATA\b"), "numpy-c-api", "raw-buffer", False),
+    (re.compile(r"\bPyArray_GETPTR\w*\b"), "numpy-c-api", "element-access", False),
+    (re.compile(r"\bPyErr_\w+\b"), "python-c-api", "exception", True),
+    (re.compile(r"\bPyList_GET_ITEM\b"), "python-c-api", "borrowed-item", True),
+    (re.compile(r"\bcudaMemcpy\w*\b"), "cuda", "device-copy", False),
+    (re.compile(r"\bcudaMalloc\w*\b"), "cuda", "allocation", False),
+    (re.compile(r"\bPyObject_Call\w*\b"), "python-c-api", "python-callback", True),
 ]
-
 
 
 class SemanticIRBuilder:
@@ -224,8 +223,6 @@ class SemanticIRBuilder:
                 parts.append(cur.name)
             cur = parents.get(id(cur))
         return ".".join(reversed(parts))
-
-
 
     @staticmethod
     def _is_assert(n):

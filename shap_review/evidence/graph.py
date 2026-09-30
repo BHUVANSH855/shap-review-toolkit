@@ -66,9 +66,7 @@ class EvidenceGraph:
             confidence=item.confidence,
             parent_ids=tuple(item.derived_from),
             execution_id=(
-                execution_id
-                if execution_id is not None
-                else item.execution_id
+                execution_id if execution_id is not None else item.execution_id
             ),
             repository_revision=(
                 repository_revision
@@ -77,13 +75,9 @@ class EvidenceGraph:
             ),
             environment=dict(environment or {}),
             transformation=(
-                transformation
-                if transformation is not None
-                else item.transformation
+                transformation if transformation is not None else item.transformation
             ),
-            fixture_id=(
-                fixture_id if fixture_id is not None else item.fixture_id
-            ),
+            fixture_id=(fixture_id if fixture_id is not None else item.fixture_id),
             input_fingerprint=(
                 input_fingerprint
                 if input_fingerprint is not None

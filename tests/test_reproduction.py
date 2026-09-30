@@ -14,9 +14,7 @@ def test_reproduction_runner(tmp_path: Path):
 
 def test_reproduction_runner_accepts_environment(tmp_path: Path):
     script = tmp_path / "env.py"
-    script.write_text(
-        'import os; print(os.environ["SHAP_REVIEW_TEST"])'
-    )
+    script.write_text('import os; print(os.environ["SHAP_REVIEW_TEST"])')
 
     result = run_script(
         str(script),
@@ -26,15 +24,25 @@ def test_reproduction_runner_accepts_environment(tmp_path: Path):
     assert result["passed"] is True
     assert "ok" in result["stdout"]
 
+
 def test_historical_nullable_dtype_reproduction_has_explicit_status():
     import pytest
+
     pytest.importorskip("shap")
     pytest.importorskip("pandas")
     pytest.importorskip("sklearn")
     from shap_review.regressions import run_4911
 
     result = run_4911()
-    assert result.status in {"reproduced", "not_reproduced", "blocked", "ambiguous", "target_failure", "toolkit_failure", "unsupported"}
+    assert result.status in {
+        "reproduced",
+        "not_reproduced",
+        "blocked",
+        "ambiguous",
+        "target_failure",
+        "toolkit_failure",
+        "unsupported",
+    }
     if result.status == "ambiguous":
         assert result.reproduced is False
     else:
@@ -43,6 +51,7 @@ def test_historical_nullable_dtype_reproduction_has_explicit_status():
 
 def test_historical_expected_value_reproduction_is_stable():
     import pytest
+
     pytest.importorskip("shap")
     pytest.importorskip("xgboost")
     pytest.importorskip("sklearn")
@@ -54,6 +63,7 @@ def test_historical_expected_value_reproduction_is_stable():
 
 def test_historical_model_output_reproduction_requires_source_grounded_precondition():
     import pytest
+
     pytest.importorskip("shap")
     from shap_review.regressions import run_5098
 

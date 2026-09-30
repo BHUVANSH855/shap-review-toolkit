@@ -37,6 +37,7 @@ from adapters.interface import AdapterCapabilities, AdapterError, AdapterRequest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _all_adapters():
     return [ClaudeAdapter(), OpenAIAdapter(), GeminiAdapter()]
 
@@ -44,9 +45,7 @@ def _all_adapters():
 def _declared_command_enum(manifest: dict) -> list[str] | None:
     """Return the nested command enum from a provider manifest, if present."""
     if manifest.get("type") == "function":
-        return (
-            manifest["function"]["parameters"]["properties"]["command"]["enum"]
-        )
+        return manifest["function"]["parameters"]["properties"]["command"]["enum"]
     if "parameters" in manifest:
         props = manifest["parameters"]["properties"]
         if "command" in props and "enum" in props["command"]:
@@ -88,6 +87,7 @@ def _assert_provider_manifest_contract(
 # Provider identity
 # ---------------------------------------------------------------------------
 
+
 def test_each_provider_has_distinct_identity():
     """Provider string must be unique per adapter class, not inherited from base."""
     adapters = _all_adapters()
@@ -113,6 +113,7 @@ def test_base_adapter_provider_is_generic():
 # Built-in commands
 # ---------------------------------------------------------------------------
 
+
 def test_all_adapters_share_same_command_list():
     command_sets = [tuple(a.capabilities.commands) for a in _all_adapters()]
     assert len(set(command_sets)) == 1, "command lists diverged across providers"
@@ -127,6 +128,7 @@ def test_capabilities_command_returns_correct_provider():
 
 def test_capabilities_includes_all_core_commands():
     from shap_review.version import CAPABILITIES
+
     for adapter in _all_adapters():
         result = adapter.invoke("capabilities")
         assert result["result"]["commands"] == list(CAPABILITIES)
@@ -154,6 +156,7 @@ def test_capabilities_surfaces_dynamic_evidence_note():
 
 def test_version_command_returns_canonical_metadata():
     from shap_review.version import SCHEMA_VERSION, VERSION
+
     for adapter in _all_adapters():
         result = adapter.invoke("version")
         assert result["result"]["version"] == VERSION
@@ -192,9 +195,11 @@ def test_evidence_command_surfaces_dynamic_evidence_note():
 # Response envelope
 # ---------------------------------------------------------------------------
 
+
 def test_response_envelope_always_contains_metadata():
     """Every invoke() response must contain provider, version, schema_version, command."""
     from shap_review.version import SCHEMA_VERSION, VERSION
+
     for adapter in _all_adapters():
         result = adapter.invoke("version")
         assert result["provider"] == adapter.provider
@@ -206,6 +211,7 @@ def test_response_envelope_always_contains_metadata():
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
+
 
 def test_unknown_command_raises_adapter_error():
     """Unknown commands must raise AdapterError, not propagate to the caller."""
@@ -231,7 +237,9 @@ def test_argument_error_is_encoded_not_raised():
 def test_file_not_found_is_encoded_not_raised():
     """FileNotFoundError from the engine must be returned as a structured error."""
     adapter = OpenAIAdapter()
-    with patch("adapters.base.dispatch", side_effect=FileNotFoundError("/no/such/path")):
+    with patch(
+        "adapters.base.dispatch", side_effect=FileNotFoundError("/no/such/path")
+    ):
         result = adapter.invoke("analyze", {"root": "/no/such/path"})
     assert "error" in result
     assert result["error"]["kind"] == "PATH_NOT_FOUND"
@@ -252,6 +260,7 @@ def test_unexpected_engine_error_is_encoded_not_raised():
 # Security — script execution commands
 # ---------------------------------------------------------------------------
 
+
 def test_script_execution_commands_are_documented():
     """The set of script-execution commands must be non-empty and stable."""
     assert "differential" in _SCRIPT_EXECUTION_COMMANDS
@@ -263,20 +272,22 @@ def test_script_execution_commands_are_documented():
 def test_script_execution_commands_log_warning(caplog):
     """Invoking a script-execution command must emit a security warning."""
     import logging
+
     adapter = ClaudeAdapter()
     # Patch dispatch so we don't need a real script file.
     with patch("adapters.base.dispatch", return_value={"status": "ok"}):
         with caplog.at_level(logging.WARNING, logger="adapters.base"):
             adapter.invoke("reproduce", {"root": ".", "script": "x.py"})
-    assert any("subprocess" in r.message.lower() or "script" in r.message.lower()
-                for r in caplog.records), (
-        "script-execution command must emit a security warning log"
-    )
+    assert any(
+        "subprocess" in r.message.lower() or "script" in r.message.lower()
+        for r in caplog.records
+    ), "script-execution command must emit a security warning log"
 
 
 # ---------------------------------------------------------------------------
 # AdapterRequest validation
 # ---------------------------------------------------------------------------
+
 
 def test_adapter_request_validate_rejects_unknown_command():
     req = AdapterRequest(command="bad-command", provider="test")
@@ -294,8 +305,10 @@ def test_adapter_request_validate_accepts_known_command():
 # AdapterCapabilities
 # ---------------------------------------------------------------------------
 
+
 def test_adapter_capabilities_to_dict_is_complete():
     from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
+
     caps = AdapterCapabilities(provider="test")
     d = caps.to_dict()
     assert d["provider"] == "test"
@@ -308,6 +321,7 @@ def test_adapter_capabilities_to_dict_is_complete():
 
 def test_adapter_capabilities_version_defaults_to_current():
     from shap_review.version import VERSION
+
     caps = AdapterCapabilities(provider="x")
     assert caps.version == VERSION
 
@@ -315,6 +329,7 @@ def test_adapter_capabilities_version_defaults_to_current():
 # ---------------------------------------------------------------------------
 # JSON manifests
 # ---------------------------------------------------------------------------
+
 
 def test_provider_manifests_match_canonical():
     from shap_review.version import CAPABILITIES, SCHEMA_VERSION, VERSION
@@ -361,7 +376,11 @@ def test_manifests_do_not_contain_nonexistent_verdict():
 def test_manifests_contain_security_note():
     """All manifests with a top-level security_note field must document subprocess."""
     for provider in ("claude", "openai", "gemini"):
-        for name in ("tool-schema.json", "tool-definition.json", "function-declaration.json"):
+        for name in (
+            "tool-schema.json",
+            "tool-definition.json",
+            "function-declaration.json",
+        ):
             path = Path("adapters") / provider / name
             if not path.exists():
                 continue
@@ -377,11 +396,10 @@ def test_manifests_contain_security_note():
 
 def test_openai_tool_definition_nested_command_enum_matches_capabilities():
     from shap_review.version import CAPABILITIES
+
     path = Path("adapters/openai/tool-definition.json")
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    declared = (
-        manifest["function"]["parameters"]["properties"]["command"]["enum"]
-    )
+    declared = manifest["function"]["parameters"]["properties"]["command"]["enum"]
     assert declared == list(CAPABILITIES)
 
 
@@ -403,6 +421,7 @@ def test_manifests_contain_dynamic_evidence_note_in_evidence_model():
 # ---------------------------------------------------------------------------
 # Backend adapter (backend matrix — these live in shap_review.backends)
 # ---------------------------------------------------------------------------
+
 
 def test_backend_adapter_reports_actual_failure_stage():
     from shap_review.backends.adapter import MatrixBackendAdapter
@@ -471,8 +490,10 @@ def test_backend_adapter_protocol_is_exported():
 # repr
 # ---------------------------------------------------------------------------
 
+
 def test_adapter_repr_contains_provider_and_version():
     from shap_review.version import VERSION
+
     for adapter in _all_adapters():
         r = repr(adapter)
         assert adapter.provider in r

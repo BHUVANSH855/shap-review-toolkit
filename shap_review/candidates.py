@@ -44,10 +44,7 @@ class CandidateAggregator:
                         seen_e.add(k)
                         evidence.append(e)
 
-            score = sum(
-                EVIDENCE_TIER.get(e.kind, max(1, e.strength))
-                for e in evidence
-            )
+            score = sum(EVIDENCE_TIER.get(e.kind, max(1, e.strength)) for e in evidence)
             independent_kinds = len({e.kind for e in evidence})
 
             # Multiple analyzers firing on the same location is NOT independent
@@ -81,9 +78,7 @@ class CandidateAggregator:
                     # Historical corpus records are external facts, not derived
                     # observations from the current analysis run.
                     "origin": (
-                        "external"
-                        if e.kind in {"issue", "pull_request"}
-                        else "source"
+                        "external" if e.kind in {"issue", "pull_request"} else "source"
                     ),
                 }
                 for e in evidence

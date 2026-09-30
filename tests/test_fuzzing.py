@@ -32,10 +32,7 @@ def test_fuzzer_classifies_all_failures():
     from shap_review.runtime_bridge import _classify_anomaly
 
     result = TreeExplainerFuzzer(seed=123).run(iterations=25)
-    representations = {
-        item["case"]["representation"]
-        for item in result["results"]
-    }
+    representations = {item["case"]["representation"] for item in result["results"]}
 
     assert {"ndarray", "dataframe"} <= representations
 
@@ -85,8 +82,7 @@ def test_fuzzer_anomaly_has_sufficient_confidence_when_real():
         # For genuine SHAP-attributed failures, confidence must be > 0.
         if classification["bug_class"] is not None:
             assert classification["confidence"] > 0, (
-                "SHAP-attributed failure has confidence=0: "
-                f"{classification}"
+                f"SHAP-attributed failure has confidence=0: {classification}"
             )
 
 
@@ -143,8 +139,9 @@ def test_fuzzer_results_preserve_execution_and_input_provenance():
         provenance = item["provenance"]
 
         assert provenance["execution_id"] == result["provenance"]["execution_id"]
-        assert provenance["target_fingerprint"] == (
-            result["provenance"]["target_fingerprint"]
+        assert (
+            provenance["target_fingerprint"]
+            == (result["provenance"]["target_fingerprint"])
         )
         assert provenance["input_fingerprint"]
 
@@ -158,8 +155,9 @@ def test_fuzzer_target_fingerprint_is_stable_for_same_configuration():
     first = TreeExplainerFuzzer(seed=31).run(iterations=1)
     second = TreeExplainerFuzzer(seed=31).run(iterations=1)
 
-    assert first["provenance"]["target_fingerprint"] == (
-        second["provenance"]["target_fingerprint"]
+    assert (
+        first["provenance"]["target_fingerprint"]
+        == (second["provenance"]["target_fingerprint"])
     )
 
 
@@ -168,9 +166,8 @@ def test_fuzzer_execution_id_changes_with_campaign_parameters():
     first = TreeExplainerFuzzer(seed=41).run(iterations=1)
     second = TreeExplainerFuzzer(seed=42).run(iterations=1)
 
-    assert first["provenance"]["execution_id"] != (
-        second["provenance"]["execution_id"]
-    )
+    assert first["provenance"]["execution_id"] != (second["provenance"]["execution_id"])
+
 
 def test_review_engine_runtime_bridge_artifact_marks_installed_runtime(tmp_path):
     from shap_review.engine import ReviewEngine
@@ -204,6 +201,7 @@ def test_review_engine_runtime_bridge_artifact_marks_installed_runtime(tmp_path)
     assert payload["repository_runtime_match"] is False
     assert payload["attach_policy"] == "explicit-candidate-correlation-only"
 
+
 def test_protocol_campaign_executes_protocols():
     from shap_review.fuzzing.protocol_campaign import ProtocolCampaign
 
@@ -217,6 +215,7 @@ def test_protocol_campaign_executes_protocols():
     assert result["executed"] == 20
     assert result["protocols_observed"]
     assert result["mutation_observed"] >= 0
+
 
 def test_protocol_every_declared_protocol_is_triggerable():
     from shap_review.fuzzing.generators.protocol import PROTOCOLS
@@ -239,6 +238,7 @@ def test_backend_matrix_has_primary_tree_backends():
 
     assert {"sklearn", "xgboost", "lightgbm", "catboost"} <= names
     assert "backend" in matrix_dimensions()
+
 
 def test_protocol_campaign_records_real_protocol_events():
     from shap_review.fuzzing.protocol_campaign import ProtocolCampaign
@@ -273,14 +273,22 @@ def test_protocol_campaign_reports_requested_and_observed_adversarial_modes():
 
 
 def test_protocol_campaign_scenarios_report_runtime_boundaries():
-    target = __import__("shap_review.fuzzing.protocol_campaign", fromlist=["make_default_treeexplainer_protocol_target"]).make_default_treeexplainer_protocol_target()
+    target = __import__(
+        "shap_review.fuzzing.protocol_campaign",
+        fromlist=["make_default_treeexplainer_protocol_target"],
+    ).make_default_treeexplainer_protocol_target()
     from shap_review.fuzzing.protocol_campaign import ProtocolCampaign
 
     result = ProtocolCampaign(seed=3).run(
-        target_callable=target, iterations=6,
+        target_callable=target,
+        iterations=6,
         scenarios=("shape-dtype", "array-coercion", "indexing"),
     )
-    boundaries = {item["case"]["scenario"]: item["scenario_boundary"] for item in result["results"] if item["scenario_boundary"]}
+    boundaries = {
+        item["case"]["scenario"]: item["scenario_boundary"]
+        for item in result["results"]
+        if item["scenario_boundary"]
+    }
     assert "np.asarray" in boundaries["array-coercion"]
     assert "obj[0]" in boundaries["indexing"]
     assert "shape/dtype" in boundaries["shape-dtype"]
@@ -291,12 +299,19 @@ def test_protocol_reentry_records_nested_execution_without_harness_callback():
 
     from shap_review.fuzzing.generators.protocol import ProtocolObject
 
-    parent = ProtocolObject(random.Random(0), "shape", reentry=True, reentry_target=lambda obj: obj.events.append("nested-execution"))
+    parent = ProtocolObject(
+        random.Random(0),
+        "shape",
+        reentry=True,
+        reentry_target=lambda obj: obj.events.append("nested-execution"),
+    )
     parent.state["outer_execution_id"] = "outer-1"
     parent._touch("shape")
     assert parent.reentered
     assert parent.reentry_depth == 0
-    assert not any(e.endswith(":shap") for e in parent.events if e.startswith("reentry:"))
+    assert not any(
+        e.endswith(":shap") for e in parent.events if e.startswith("reentry:")
+    )
     assert any(e.startswith("reentry:shape") for e in parent.events)
 
 
@@ -309,7 +324,14 @@ def test_protocol_mutation_events_are_typed():
     _ = obj.shape
     mutated = obj.mutation_events
     assert mutated
-    assert {e["type"] for e in mutated} <= {"value", "protocol_metadata", "strides", "buffer_replacement", "payload_identity", "writeability"}
+    assert {e["type"] for e in mutated} <= {
+        "value",
+        "protocol_metadata",
+        "strides",
+        "buffer_replacement",
+        "payload_identity",
+        "writeability",
+    }
     assert all(e["changed"] for e in mutated)
     assert all(e["value_before"] != e["value_after"] for e in mutated)
     assert all(e["object_identity_changed"] is False for e in mutated)
@@ -335,7 +357,10 @@ def test_protocol_coverage_separates_harness_and_target():
     assert "harness_triggered_protocols" in result
     assert "target_observed_protocols" in result
     assert "shap_observed_protocols" in result
-    assert result["target_observed_coverage_percent"] >= result["shap_observed_coverage_percent"]
+    assert (
+        result["target_observed_coverage_percent"]
+        >= result["shap_observed_coverage_percent"]
+    )
 
 
 def test_backend_status_taxonomy_includes_failure_stages():
@@ -351,10 +376,21 @@ def test_protocol_event_preserves_exact_shap_call_provenance():
         make_default_treeexplainer_protocol_target,
     )
 
-    result = ProtocolCampaign(seed=4).run(target_callable=make_default_treeexplainer_protocol_target(), iterations=10)
-    events = [event for row in result["results"] for event in row.get("protocol_events_detail", [])]
+    result = ProtocolCampaign(seed=4).run(
+        target_callable=make_default_treeexplainer_protocol_target(), iterations=10
+    )
+    events = [
+        event
+        for row in result["results"]
+        for event in row.get("protocol_events_detail", [])
+    ]
     shap_events = [event for event in events if event.get("causal_to_active_shap_call")]
-    assert all(event.get("shap_call_id") and event.get("callback_event_id") and event.get("shap_function") for event in shap_events)
+    assert all(
+        event.get("shap_call_id")
+        and event.get("callback_event_id")
+        and event.get("shap_function")
+        for event in shap_events
+    )
     assert all(event.get("causal_confidence") == "high" for event in shap_events)
 
 
@@ -363,7 +399,13 @@ def test_natural_reentry_requires_an_exact_shap_callback():
 
     from shap_review.fuzzing.generators.protocol import ProtocolObject
 
-    obj = ProtocolObject(random.Random(0), "shape", reentry=True, reentry_target=lambda o: o.events.append("nested"), allow_harness_reentry=False)
+    obj = ProtocolObject(
+        random.Random(0),
+        "shape",
+        reentry=True,
+        reentry_target=lambda o: o.events.append("nested"),
+        allow_harness_reentry=False,
+    )
     obj._touch("shape")
     assert not obj.reentered
 
@@ -373,8 +415,17 @@ def test_fuzz_treeexplainer_cli_command_is_available():
     import sys
 
     result = subprocess.run(
-        [sys.executable, "-m", "shap_review.cli", "fuzz-treeexplainer", "--iterations", "1"],
-        capture_output=True, text=True, check=False,
+        [
+            sys.executable,
+            "-m",
+            "shap_review.cli",
+            "fuzz-treeexplainer",
+            "--iterations",
+            "1",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 
@@ -408,7 +459,10 @@ def test_protocol_mutations_distinguish_metadata_from_storage():
     write_obj = ProtocolObject(random.Random(1), "shape", mutation="writeability")
     _ = write_obj.shape
     write_event = write_obj.mutation_events[-1]
-    assert write_event["writeable_before"] is True and write_event["writeable_after"] is False
+    assert (
+        write_event["writeable_before"] is True
+        and write_event["writeable_after"] is False
+    )
 
 
 def test_backend_execution_summary_exposes_not_executed_reasons():
@@ -448,7 +502,9 @@ def test_real_treeexplainer_protocol_target_has_boundary_metadata():
 def test_treeexplainer_harness_uses_canonical_reducer():
     from pathlib import Path
 
-    text = (Path(__file__).parents[1] / "shap_review/fuzzing/harnesses/treeexplainer.py").read_text()
+    text = (
+        Path(__file__).parents[1] / "shap_review/fuzzing/harnesses/treeexplainer.py"
+    ).read_text()
     assert "def _sum_shap" not in text
     assert "SHAPSemanticTensor" in text
 
@@ -464,8 +520,19 @@ def test_semantic_oracle_cli_dispatches_a_valid_contract():
     from shap_review.cli import dispatch
 
     payload = {
-        "contract": {"explainer": "TreeExplainer", "model_family": "tree", "model_output": "raw", "values_shape": [-1, 2], "target_shape": [-1], "additivity_required": True, "output_space_required": True, "tolerance": 1e-6},
-        "values": [[1, 2], [3, 4]], "base_values": [0, 0], "target": [3, 7],
+        "contract": {
+            "explainer": "TreeExplainer",
+            "model_family": "tree",
+            "model_output": "raw",
+            "values_shape": [-1, 2],
+            "target_shape": [-1],
+            "additivity_required": True,
+            "output_space_required": True,
+            "tolerance": 1e-6,
+        },
+        "values": [[1, 2], [3, 4]],
+        "base_values": [0, 0],
+        "target": [3, 7],
     }
     result = dispatch("semantic-oracle", arguments=payload)
     assert result["valid"] is True

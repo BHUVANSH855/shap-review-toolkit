@@ -54,38 +54,32 @@ from .version import CAPABILITIES, SCHEMA_VERSION, VERSION
 __version__ = VERSION
 
 __all__ = [
-    # Contracts
+    "CAPABILITIES",
+    "SCHEMA_VERSION",
+    "VERSION",
     "AdditivityOracle",
+    "Candidate",
+    "EvidenceChain",
+    "EvidenceItem",
+    "EvidenceKind",
+    "EvidenceOrigin",
     "ExpectedValueOracle",
+    "Finding",
+    "FindingStatus",
     "InputMutationOracle",
     "InteractionOracle",
     "OracleResult",
     "OracleStatus",
     "OutputSpaceOracle",
+    "PromotionPolicy",
     "SHAPAxisSpec",
     "SHAPContract",
     "SHAPSemanticOracle",
     "SHAPSemanticTensor",
     "ShapeOracle",
-    "dtype_tolerance",
-    "validate_contract",
-    # Evidence
-    "EvidenceChain",
-    "EvidenceItem",
-    "EvidenceKind",
-    "EvidenceOrigin",
-    # Findings
-    "FindingStatus",
-    "PromotionPolicy",
-    "transition",
-    # Types
-    "Candidate",
-    "Finding",
-    # Reproduction
-    "run_script",
-    # Version
-    "CAPABILITIES",
-    "SCHEMA_VERSION",
-    "VERSION",
     "__version__",
+    "dtype_tolerance",
+    "run_script",
+    "transition",
+    "validate_contract",
 ]

@@ -182,6 +182,7 @@ def test_shap_contract_validation():
 
     assert result["values_shape_match"]
 
+
 def test_evidence_graph_rejects_shared_ancestry_as_independent():
     from shap_review.evidence.chain import build_chain
 
@@ -240,6 +241,7 @@ def test_semantic_contract_executes_additivity_oracle():
     assert result["valid"]
     assert result["semantic_oracle"]["passed"]
 
+
 def test_axis_roles_reject_conflicting_assignments():
     import pytest
 
@@ -249,7 +251,12 @@ def test_axis_roles_reject_conflicting_assignments():
         SHAPAxisSpec(sample_axis=0, feature_axis=0),
         SHAPAxisSpec(sample_axis=0, feature_axis=1, output_axis=0),
         SHAPAxisSpec(sample_axis=0, feature_axis=1, interaction_feature_axes=(0, 2)),
-        SHAPAxisSpec(sample_axis=0, feature_axis=1, output_axis=2, interaction_feature_axes=(1, 2)),
+        SHAPAxisSpec(
+            sample_axis=0,
+            feature_axis=1,
+            output_axis=2,
+            interaction_feature_axes=(1, 2),
+        ),
     ]:
         with pytest.raises(ValueError):
             spec.normalize(4)
@@ -298,8 +305,11 @@ def test_contract_wildcard_dimension_matches_any_size():
     from shap_review.contracts.shap_contract import SHAPContract, validate_contract
 
     contract = SHAPContract(
-        explainer="TreeExplainer", model_family="tree", values_shape=(-1, 3),
-        additivity_required=False, output_space_required=False,
+        explainer="TreeExplainer",
+        model_family="tree",
+        values_shape=(-1, 3),
+        additivity_required=False,
+        output_space_required=False,
     )
     result = validate_contract(contract, np.zeros((7, 3)))
     assert result["values_shape_match"]
@@ -311,12 +321,21 @@ def test_multiclass_additivity_preserves_output_axis():
     from shap_review.contracts import SHAPContract
     from shap_review.contracts.oracles import AdditivityOracle
 
-    contract = SHAPContract("TreeExplainer", "tree", model_output="raw", additivity_required=True, tolerance=1e-8)
+    contract = SHAPContract(
+        "TreeExplainer",
+        "tree",
+        model_output="raw",
+        additivity_required=True,
+        tolerance=1e-8,
+    )
     values = np.zeros((2, 3, 2))
     values[:, :, 0] = 1
     values[:, :, 1] = 2
     result = AdditivityOracle().check(
-        values=values, base_values=np.zeros(2), model_output=np.array([[3.0, 6.0], [3.0, 6.0]]), contract=contract
+        values=values,
+        base_values=np.zeros(2),
+        model_output=np.array([[3.0, 6.0], [3.0, 6.0]]),
+        contract=contract,
     )
     assert result.passed
     assert result.details["contribution_shape"] == [2, 2]
@@ -330,8 +349,10 @@ def test_interaction_additivity_reduces_feature_axes():
 
     contract = SHAPContract("TreeExplainer", "tree", interaction=True, tolerance=1e-8)
     result = AdditivityOracle().check(
-        values=np.ones((2, 3, 3)), base_values=np.zeros(2),
-        model_output=np.full(2, 9.0), contract=contract
+        values=np.ones((2, 3, 3)),
+        base_values=np.zeros(2),
+        model_output=np.full(2, 9.0),
+        contract=contract,
     )
     assert result.passed
 
@@ -368,8 +389,10 @@ def test_wrong_output_reconstruction_is_not_certified():
 
     contract = SHAPContract("TreeExplainer", "tree", model_output="raw", tolerance=1e-8)
     result = OutputSpaceOracle().check(
-        contract=contract, shap_values=np.array([[1.0, 1.0]]),
-        base_values=np.array([0.0]), model_output=np.array([9.0])
+        contract=contract,
+        shap_values=np.array([[1.0, 1.0]]),
+        base_values=np.array([0.0]),
+        model_output=np.array([9.0]),
     )
     assert result.passed is False
 
@@ -380,8 +403,10 @@ def test_failed_additivity_reconstruction_is_not_certified():
     from shap_review.fuzzing.backend_matrix import _semantic_additivity
 
     passed, _, oracle = _semantic_additivity(
-        np.array([[1.0, 2.0], [1.0, 2.0]]), np.array([0.0, 0.0]),
-        np.array([99.0, 99.0]), backend="test"
+        np.array([[1.0, 2.0], [1.0, 2.0]]),
+        np.array([0.0, 0.0]),
+        np.array([99.0, 99.0]),
+        backend="test",
     )
     assert passed is False
     assert oracle["status"] == "SEMANTIC_MISMATCH"
@@ -394,10 +419,17 @@ def test_policy_required_output_space_remains_required():
     from shap_review.contracts.oracles import OraclePolicy, SHAPSemanticOracle
     from shap_review.contracts.shap_contract import SHAPContract
 
-    contract = SHAPContract("TreeExplainer", "tree", additivity_required=True, output_space_required=False)
+    contract = SHAPContract(
+        "TreeExplainer", "tree", additivity_required=True, output_space_required=False
+    )
     result = SHAPSemanticOracle().evaluate(
-        contract=contract, values=np.ones((2, 2)), base_values=np.zeros(2), model_output=None,
-        policy=OraclePolicy(require_shape=False, require_additivity=False, require_output_space=True),
+        contract=contract,
+        values=np.ones((2, 2)),
+        base_values=np.zeros(2),
+        model_output=None,
+        policy=OraclePolicy(
+            require_shape=False, require_additivity=False, require_output_space=True
+        ),
     )
     assert result["status"] == "INCONCLUSIVE"
     assert "OutputSpaceOracle" in result["required_checks"]
@@ -411,8 +443,13 @@ def test_required_additivity_without_base_values_is_inconclusive():
 
     contract = SHAPContract("TreeExplainer", "tree", additivity_required=False)
     result = SHAPSemanticOracle().evaluate(
-        contract=contract, values=np.ones((2, 2)), base_values=None, model_output=np.zeros(2),
-        policy=OraclePolicy(require_shape=False, require_additivity=True, require_output_space=False),
+        contract=contract,
+        values=np.ones((2, 2)),
+        base_values=None,
+        model_output=np.zeros(2),
+        policy=OraclePolicy(
+            require_shape=False, require_additivity=True, require_output_space=False
+        ),
     )
     assert result["status"] == "INCONCLUSIVE"
     additivity = next(x for x in result["results"] if x["name"] == "AdditivityOracle")
@@ -426,7 +463,8 @@ def test_expected_value_rejects_wrong_per_sample_baseline():
 
     result = ExpectedValueOracle().check(
         base_values=np.array([[1.0, 2.0], [1.0, 3.0]]),
-        expected_value=np.array([1.0, 2.0]), semantics="per-sample",
+        expected_value=np.array([1.0, 2.0]),
+        semantics="per-sample",
     )
     assert result.passed is False
 
@@ -437,42 +475,19 @@ def test_required_oracles_without_runtime_inputs_are_inconclusive():
     from shap_review.contracts.oracles import OraclePolicy, SHAPSemanticOracle
     from shap_review.contracts.shap_contract import SHAPContract
 
-    contract = SHAPContract("TreeExplainer", "tree", additivity_required=True, output_space_required=True)
+    contract = SHAPContract(
+        "TreeExplainer", "tree", additivity_required=True, output_space_required=True
+    )
     result = SHAPSemanticOracle().evaluate(
-        contract=contract, values=np.ones((2, 3)), base_values=None, model_output=None,
-        policy=OraclePolicy(require_shape=False, require_additivity=True, require_output_space=True),
+        contract=contract,
+        values=np.ones((2, 3)),
+        base_values=None,
+        model_output=None,
+        policy=OraclePolicy(
+            require_shape=False, require_additivity=True, require_output_space=True
+        ),
     )
     assert result["status"] == "INCONCLUSIVE"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def test_legacy_list_outputs_are_canonicalized():
@@ -493,7 +508,9 @@ def test_interaction_reduction_preserves_output_axis():
     values = np.ones((2, 3, 3, 2))
     base = np.zeros((2, 2))
     tensor = SHAPSemanticTensor.from_values(
-        values, base_values=base, interaction=True,
+        values,
+        base_values=base,
+        interaction=True,
         axis_spec=SHAPAxisSpec(output_axis=3, interaction_feature_axes=(1, 2)),
     )
     assert tensor.reduce_contributions().shape == (2, 2)
@@ -506,6 +523,7 @@ def test_interaction_reduction_preserves_output_axis():
 # ---------------------------------------------------------------------------
 # C-1: dtype-adaptive tolerance in validate_contract / SHAPContract
 # ---------------------------------------------------------------------------
+
 
 def test_validate_contract_float32_uses_relaxed_tolerance():
     """float32 SHAP values must NOT fail validate_contract with default tolerance.
@@ -529,7 +547,8 @@ def test_validate_contract_float32_uses_relaxed_tolerance():
     target += np.float32(1e-4)
 
     contract = SHAPContract(
-        "TreeExplainer", "tree",
+        "TreeExplainer",
+        "tree",
         additivity_required=True,
         values_shape=(n, f),
     )
@@ -613,9 +632,7 @@ def test_float32_additivity_error_within_tolerance_does_not_fail():
     contract = SHAPContract("TreeExplainer", "tree", additivity_required=True)
     result = validate_contract(contract, values, base, target)
 
-    results_by_name = {
-        r["name"]: r for r in result["semantic_oracle"]["results"]
-    }
+    results_by_name = {r["name"]: r for r in result["semantic_oracle"]["results"]}
     additivity = results_by_name.get("AdditivityOracle")
     if additivity and additivity.get("applicable"):
         assert additivity.get("passed") is not False, (
@@ -639,9 +656,7 @@ def test_float32_additivity_error_exceeding_tolerance_fails():
     contract = SHAPContract("TreeExplainer", "tree", additivity_required=True)
     result = validate_contract(contract, values, base, target)
 
-    results_by_name = {
-        r["name"]: r for r in result["semantic_oracle"]["results"]
-    }
+    results_by_name = {r["name"]: r for r in result["semantic_oracle"]["results"]}
     additivity = results_by_name.get("AdditivityOracle")
     if additivity and additivity.get("applicable"):
         assert additivity.get("passed") is False, (
@@ -652,6 +667,7 @@ def test_float32_additivity_error_exceeding_tolerance_fails():
 # ---------------------------------------------------------------------------
 # H-4: log-loss OutputSpaceOracle must be NOT_APPLICABLE, not INCONCLUSIVE
 # ---------------------------------------------------------------------------
+
 
 def test_log_loss_oracle_without_true_labels_is_not_applicable():
     """OutputSpaceOracle for log_loss without true_labels must return NOT_APPLICABLE.
@@ -667,7 +683,9 @@ def test_log_loss_oracle_without_true_labels_is_not_applicable():
     from shap_review.contracts.shap_contract import SHAPContract
 
     contract = SHAPContract(
-        "TreeExplainer", "tree", model_output="log_loss",
+        "TreeExplainer",
+        "tree",
+        model_output="log_loss",
         output_space_required=True,
     )
     oracle = OutputSpaceOracle()
@@ -680,7 +698,9 @@ def test_log_loss_oracle_without_true_labels_is_not_applicable():
     # applicable=False → NOT_APPLICABLE, not INCONCLUSIVE.
     assert result.applicable is False
     assert result.passed is None
-    assert "true_labels" in result.reason.lower() or "NOT_APPLICABLE" in (result.details or {}).get("resolution", "")
+    assert "true_labels" in result.reason.lower() or "NOT_APPLICABLE" in (
+        result.details or {}
+    ).get("resolution", "")
 
 
 def test_log_loss_oracle_status_is_not_applicable_not_inconclusive():
@@ -704,6 +724,7 @@ def test_log_loss_oracle_status_is_not_applicable_not_inconclusive():
 # ---------------------------------------------------------------------------
 # OracleStatus enum — must be used in oracle returns
 # ---------------------------------------------------------------------------
+
 
 def test_oracle_status_from_result_pass():
     from shap_review.contracts.oracles import OracleResult, OracleStatus
@@ -738,6 +759,7 @@ def test_oracle_status_from_result_not_applicable():
 # ---------------------------------------------------------------------------
 # ORACLE_REGISTRY thread safety
 # ---------------------------------------------------------------------------
+
 
 def test_oracle_registry_thread_safe_concurrent_read():
     """Concurrent oracle evaluation must not produce partial-registry results."""
@@ -797,6 +819,7 @@ def test_oracle_registry_snapshot_isolates_from_later_mutations():
 
     # Clean up.
     from shap_review.contracts.oracles import _REGISTRY_LOCK, ORACLE_REGISTRY
+
     with _REGISTRY_LOCK:
         ORACLE_REGISTRY.pop("__test_stub__", None)
 
@@ -804,6 +827,7 @@ def test_oracle_registry_snapshot_isolates_from_later_mutations():
 # ---------------------------------------------------------------------------
 # InteractionOracle — same-ndim INCONCLUSIVE (not false-positive PASS)
 # ---------------------------------------------------------------------------
+
 
 def test_interaction_oracle_same_ndim_is_inconclusive_not_pass():
     """Passing the interaction tensor as both values and interaction_values is INCONCLUSIVE.

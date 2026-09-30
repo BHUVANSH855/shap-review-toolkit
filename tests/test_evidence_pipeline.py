@@ -18,10 +18,7 @@ def test_issue_4911_signal_is_evidence_linked():
 
     assert any(
         candidate.bug_class == "SHAP-05"
-        and any(
-            evidence.source == "SHAP-EVID-4911"
-            for evidence in candidate.evidence
-        )
+        and any(evidence.source == "SHAP-EVID-4911" for evidence in candidate.evidence)
         for candidate in candidates
     )
 
@@ -31,10 +28,7 @@ def test_issue_5098_signal_is_evidence_linked():
 
     assert any(
         candidate.bug_class == "SHAP-02"
-        and any(
-            evidence.source == "SHAP-EVID-5098"
-            for evidence in candidate.evidence
-        )
+        and any(evidence.source == "SHAP-EVID-5098" for evidence in candidate.evidence)
         for candidate in candidates
     )
 
@@ -43,8 +37,7 @@ def test_issue_4869_is_test_gap_not_defect():
     candidates = run(FIX / "shap_4869_interaction_gap")
 
     assert any(
-        candidate.bug_class == "SHAP-01"
-        and not candidate.validation_required
+        candidate.bug_class == "SHAP-01" and not candidate.validation_required
         for candidate in candidates
     )
 
@@ -254,9 +247,7 @@ def test_runtime_anomaly_with_matching_bug_class_is_not_attached_without_correla
     candidates = run(FIX / "shap_4911_nullable_dtype")
 
     target = next(
-        candidate
-        for candidate in candidates
-        if candidate.bug_class == "SHAP-05"
+        candidate for candidate in candidates if candidate.bug_class == "SHAP-05"
     )
 
     original_chain_size = len(target.evidence_chain.items)
@@ -310,9 +301,7 @@ def test_correlated_runtime_anomaly_can_attach_to_matching_candidate():
     candidates = run(FIX / "shap_4911_nullable_dtype")
 
     target = next(
-        candidate
-        for candidate in candidates
-        if candidate.bug_class == "SHAP-05"
+        candidate for candidate in candidates if candidate.bug_class == "SHAP-05"
     )
 
     candidate_fingerprint = _candidate_fingerprint(target)
@@ -358,9 +347,7 @@ def test_correlated_runtime_anomaly_can_attach_to_matching_candidate():
     result = updated[0]
 
     dynamic = [
-        item
-        for item in result.evidence_chain.items
-        if item.source == "runtime-bridge"
+        item for item in result.evidence_chain.items if item.source == "runtime-bridge"
     ]
 
     assert len(dynamic) == 1
@@ -540,9 +527,7 @@ def test_evidence_gate_rejects_static_confirmation():
     from shap_review.findings.lifecycle import evidence_transition
     from shap_review.types import FindingStatus
 
-    chain = EvidenceChain(
-        [EvidenceItem(EvidenceKind.STATIC, "x", "candidate", True)]
-    )
+    chain = EvidenceChain([EvidenceItem(EvidenceKind.STATIC, "x", "candidate", True)])
 
     try:
         evidence_transition(
@@ -554,6 +539,7 @@ def test_evidence_gate_rejects_static_confirmation():
         pass
     else:
         raise AssertionError("static evidence must not pass confirmation gate")
+
 
 def test_promotion_requires_runtime_evidence():
     import pytest
@@ -581,15 +567,28 @@ def test_promotion_requires_runtime_evidence():
             chain,
         )
 
+
 def test_evidence_same_execution_lineage_is_not_independent():
     from shap_review.evidence.chain import build_chain
 
     chain = build_chain(
         entries=[
-            {"kind": "dynamic", "source": "a", "claim": "a", "passed": True,
-             "evidence_id": "a", "details": {"execution_id": "run1"}},
-            {"kind": "differential", "source": "b", "claim": "b", "passed": True,
-             "evidence_id": "b", "details": {"execution_id": "run1"}},
+            {
+                "kind": "dynamic",
+                "source": "a",
+                "claim": "a",
+                "passed": True,
+                "evidence_id": "a",
+                "details": {"execution_id": "run1"},
+            },
+            {
+                "kind": "differential",
+                "source": "b",
+                "claim": "b",
+                "passed": True,
+                "evidence_id": "b",
+                "details": {"execution_id": "run1"},
+            },
         ]
     )
     assert not chain.graph.is_independent("a", "b")
@@ -601,16 +600,34 @@ def test_evidence_same_revision_and_environment_is_not_independent():
 
     graph = EvidenceGraph()
     environment = {"python": "3.13", "shap": "0.50.0"}
-    graph.add(EvidenceNode("a", "dynamic", "a", "p1", "a", True,
-                           execution_id="e1", repository_revision="r1", environment=environment))
-    graph.add(EvidenceNode("b", "differential", "b", "p2", "b", True,
-                           execution_id="e2", repository_revision="r1", environment=environment))
+    graph.add(
+        EvidenceNode(
+            "a",
+            "dynamic",
+            "a",
+            "p1",
+            "a",
+            True,
+            execution_id="e1",
+            repository_revision="r1",
+            environment=environment,
+        )
+    )
+    graph.add(
+        EvidenceNode(
+            "b",
+            "differential",
+            "b",
+            "p2",
+            "b",
+            True,
+            execution_id="e2",
+            repository_revision="r1",
+            environment=environment,
+        )
+    )
     assert not graph.is_independent("a", "b")
     assert graph.independence_reason("a", "b") == "shared-revision-environment"
-
-
-
-
 
 
 # ============================================================================
@@ -620,6 +637,7 @@ def test_evidence_same_revision_and_environment_is_not_independent():
 # ---------------------------------------------------------------------------
 # C-2: EvidenceChain graph=None conservative fallback
 # ---------------------------------------------------------------------------
+
 
 def test_two_correlated_items_without_graph_score_as_one():
     """Two items sharing execution_id without a graph must not double-count.
@@ -698,24 +716,29 @@ def test_chain_to_dict_reports_graph_attached_false():
 
     d = chain.to_dict()
     assert d["graph_attached"] is False
-    assert "conservative fallback" in d["independence_policy"].lower() or "build_chain" in d["independence_policy"]
+    assert (
+        "conservative fallback" in d["independence_policy"].lower()
+        or "build_chain" in d["independence_policy"]
+    )
 
 
 def test_chain_to_dict_reports_graph_attached_true_when_graph_present():
     """EvidenceChain.to_dict() must report graph_attached=True when a graph is present."""
     from shap_review.evidence.chain import build_chain
 
-    chain = build_chain(entries=[
-        {
-            "kind": "dynamic",
-            "source": "runtime",
-            "claim": "x",
-            "passed": True,
-            "evidence_id": "x",
-            "execution_id": "e1",
-            "input_fingerprint": "fp1",
-        }
-    ])
+    chain = build_chain(
+        entries=[
+            {
+                "kind": "dynamic",
+                "source": "runtime",
+                "claim": "x",
+                "passed": True,
+                "evidence_id": "x",
+                "execution_id": "e1",
+                "input_fingerprint": "fp1",
+            }
+        ]
+    )
     assert chain.to_dict()["graph_attached"] is True
 
 
@@ -729,12 +752,21 @@ def test_evidence_item_independent_property_is_not_pairwise():
 
     # Both items are intrinsically valid (different execution_ids, fingerprints).
     item_a = EvidenceItem(
-        EvidenceKind.DYNAMIC, "r", "a", True,
-        evidence_id="a", execution_id="e1", input_fingerprint="fp1",
+        EvidenceKind.DYNAMIC,
+        "r",
+        "a",
+        True,
+        evidence_id="a",
+        execution_id="e1",
+        input_fingerprint="fp1",
     )
     item_b = EvidenceItem(
-        EvidenceKind.DYNAMIC, "r", "b", True,
-        evidence_id="b", execution_id="e1",  # SAME execution_id → correlated
+        EvidenceKind.DYNAMIC,
+        "r",
+        "b",
+        True,
+        evidence_id="b",
+        execution_id="e1",  # SAME execution_id → correlated
         input_fingerprint="fp2",
     )
 
@@ -752,6 +784,7 @@ def test_evidence_item_independent_property_is_not_pairwise():
 # M-8: EvidenceCorpus warns on malformed records
 # ---------------------------------------------------------------------------
 
+
 def test_evidence_corpus_logs_warning_on_malformed_record(tmp_path, caplog):
     """EvidenceCorpus.from_directory() must warn on malformed canonical records.
 
@@ -767,13 +800,18 @@ def test_evidence_corpus_logs_warning_on_malformed_record(tmp_path, caplog):
     # EvidenceRecord.__init__ will raise TypeError for unexpected kwarg or
     # KeyError when **raw unpacking omits a required positional arg.
     bad = tmp_path / "SHAP-EVID-9999.json"
-    bad.write_text(json.dumps({
-        "id": "SHAP-EVID-9999",
-        "type": "issue",
-        # Missing: title, url, bug_class, invariant, affected_components,
-        # observed_behavior, expected_behavior — all required positional fields.
-        "unknown_extra_field": "this will cause TypeError on __init__",
-    }), encoding="utf-8")
+    bad.write_text(
+        json.dumps(
+            {
+                "id": "SHAP-EVID-9999",
+                "type": "issue",
+                # Missing: title, url, bug_class, invariant, affected_components,
+                # observed_behavior, expected_behavior — all required positional fields.
+                "unknown_extra_field": "this will cause TypeError on __init__",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     with caplog.at_level(logging.WARNING, logger="shap_review.evidence.corpus"):
         corpus = EvidenceCorpus.from_directory(tmp_path)
@@ -785,7 +823,9 @@ def test_evidence_corpus_logs_warning_on_malformed_record(tmp_path, caplog):
     assert any(
         "SHAP-EVID-9999" in r.message or "malformed" in r.message.lower()
         for r in caplog.records
-    ), f"Expected warning about malformed record, got: {[r.message for r in caplog.records]}"
+    ), (
+        f"Expected warning about malformed record, got: {[r.message for r in caplog.records]}"
+    )
 
 
 def test_evidence_corpus_warns_on_json_decode_error(tmp_path, caplog):
@@ -815,17 +855,22 @@ def test_evidence_corpus_loads_valid_records_alongside_malformed(tmp_path, caplo
 
     # Write one valid record.
     good = tmp_path / "SHAP-EVID-0001.json"
-    good.write_text(json.dumps({
-        "id": "SHAP-EVID-0001",
-        "type": "issue",
-        "title": "Valid record",
-        "url": "https://github.com/shap/shap/issues/1",
-        "bug_class": "SHAP-01",
-        "invariant": "INV-ATTR-001",
-        "affected_components": ["TreeExplainer"],
-        "observed_behavior": "something",
-        "expected_behavior": "something else",
-    }), encoding="utf-8")
+    good.write_text(
+        json.dumps(
+            {
+                "id": "SHAP-EVID-0001",
+                "type": "issue",
+                "title": "Valid record",
+                "url": "https://github.com/shap/shap/issues/1",
+                "bug_class": "SHAP-01",
+                "invariant": "INV-ATTR-001",
+                "affected_components": ["TreeExplainer"],
+                "observed_behavior": "something",
+                "expected_behavior": "something else",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     # Write one malformed record (missing required field).
     bad = tmp_path / "SHAP-EVID-9999.json"
@@ -849,14 +894,19 @@ def test_evidence_corpus_legacy_files_are_ignored(tmp_path):
     from shap_review.evidence.corpus import EvidenceCorpus
 
     legacy = tmp_path / "4911.json"
-    legacy.write_text(json.dumps({
-        "id": "4911",
-        "title": "legacy",
-        "url": "https://github.com/shap/shap/issues/4911",
-        "supports": [],
-        "status": "open",
-        "observation": "some observation",
-    }), encoding="utf-8")
+    legacy.write_text(
+        json.dumps(
+            {
+                "id": "4911",
+                "title": "legacy",
+                "url": "https://github.com/shap/shap/issues/4911",
+                "supports": [],
+                "status": "open",
+                "observation": "some observation",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     # Falls back to DEFAULT_EVIDENCE (no valid SHAP-EVID-* records).
     corpus = EvidenceCorpus.from_directory(tmp_path)
@@ -867,6 +917,7 @@ def test_evidence_corpus_legacy_files_are_ignored(tmp_path):
 # ---------------------------------------------------------------------------
 # H-2: PromotionPolicy inconclusive gate scoped to required items only
 # ---------------------------------------------------------------------------
+
 
 def test_promotion_not_blocked_by_non_required_inconclusive_item():
     """Non-required items with passed=None must NOT block CONFIRMED promotion.
@@ -902,8 +953,13 @@ def test_promotion_not_blocked_by_non_required_inconclusive_item():
     chain.independent_kinds.return_value = 2
     chain.independent_items.return_value = [
         EvidenceItem(
-            EvidenceKind.DYNAMIC, "runtime", "ok", True,
-            evidence_id="d1", execution_id="e1", input_fingerprint="fp1",
+            EvidenceKind.DYNAMIC,
+            "runtime",
+            "ok",
+            True,
+            evidence_id="d1",
+            execution_id="e1",
+            input_fingerprint="fp1",
         )
     ]
 
@@ -948,6 +1004,7 @@ def test_promotion_blocked_by_required_inconclusive_item():
     policy = PromotionPolicy(require_inconclusive_block=True)
 
     import pytest
+
     with pytest.raises(ValueError, match="inconclusive required"):
         policy.validate(
             FindingStatus.EVIDENCE_VALID,

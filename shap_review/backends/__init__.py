@@ -1,11 +1,5 @@
-from shap_review.fuzzing.backend_matrix import (
-    DEFAULT_BACKENDS,
-    BackendSpec,
-    discover_backends,
-    matrix_dimensions,
-)
-
 from .adapter import BackendAdapter, BackendExecution, MatrixBackendAdapter
+from .registry import DEFAULT_BACKENDS, BackendSpec, discover_backends
 
 __all__ = [
     "DEFAULT_BACKENDS",
@@ -14,5 +8,4 @@ __all__ = [
     "BackendSpec",
     "MatrixBackendAdapter",
     "discover_backends",
-    "matrix_dimensions",
 ]

@@ -81,6 +81,4 @@ def test_contribution_alignment_does_not_broadcast_output_axis():
     except ValueError as exc:
         assert "does not authorize singleton broadcast" in str(exc)
     else:
-        raise AssertionError(
-            "contribution output-axis broadcasting must be rejected"
-        )
+        raise AssertionError("contribution output-axis broadcasting must be rejected")

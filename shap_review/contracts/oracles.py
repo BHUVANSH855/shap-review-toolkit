@@ -61,7 +61,11 @@ def classify_target_provenance(
     basis = (
         "caller_declared"
         if explicit_independent is True
-        else ("caller_declared_non_independent" if explicit_independent is False else "not_declared")
+        else (
+            "caller_declared_non_independent"
+            if explicit_independent is False
+            else "not_declared"
+        )
     )
     return {
         "target_source": source_kind,
@@ -81,6 +85,7 @@ class OracleStatus(str, Enum):
     - INCONCLUSIVE  → applicable=True,  passed=None
     - NOT_APPLICABLE→ applicable=False, passed=None
     """
+
     PASS = "PASS"
     FAIL = "FAIL"
     INCONCLUSIVE = "INCONCLUSIVE"
@@ -96,7 +101,6 @@ class OracleStatus(str, Enum):
         if result.passed is False:
             return cls.FAIL
         return cls.INCONCLUSIVE
-
 
 
 def validate_oracle_result(result):
@@ -677,7 +681,6 @@ def register_oracle(name: str, oracle) -> None:
         ORACLE_REGISTRY[name] = oracle
 
 
-
 class SHAPSemanticOracle:
     def __init__(self, registry=None):
         # Snapshot the registry at construction time to avoid TOCTOU races.
@@ -786,7 +789,8 @@ class SHAPSemanticOracle:
             else:
                 r = oracle.check(**args[name])
                 d = {
-                    k: v for k, v in r.to_dict().items()
+                    k: v
+                    for k, v in r.to_dict().items()
                     if k != "status"  # status is a computed property, not a field
                 }
                 r = OracleResult(

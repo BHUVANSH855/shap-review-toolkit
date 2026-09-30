@@ -4,9 +4,7 @@ from shap_review.discovery import BuildScanner, RepositoryScanner
 
 
 def test_repository_scanner(tmp_path: Path):
-    (tmp_path / "pyproject.toml").write_text(
-        '[build-system]\nbuild-backend="x"'
-    )
+    (tmp_path / "pyproject.toml").write_text('[build-system]\nbuild-backend="x"')
     (tmp_path / "a.py").write_text("x=1")
 
     info = RepositoryScanner().scan(tmp_path)
@@ -27,6 +25,7 @@ def test_build_scanner(tmp_path: Path):
     assert "_cutils" in discovery["targets"]
     assert "_cext" in discovery["targets"]
 
+
 def test_history_reports_changed_symbols(tmp_path: Path):
     import subprocess
 
@@ -38,9 +37,7 @@ def test_history_reports_changed_symbols(tmp_path: Path):
         capture_output=True,
     )
 
-    (tmp_path / "x.py").write_text(
-        "def old_name():\n    return 1\n"
-    )
+    (tmp_path / "x.py").write_text("def old_name():\n    return 1\n")
 
     subprocess.run(
         ["git", "-C", str(tmp_path), "add", "."],
@@ -64,9 +61,7 @@ def test_history_reports_changed_symbols(tmp_path: Path):
         capture_output=True,
     )
 
-    (tmp_path / "x.py").write_text(
-        "def new_name():\n    return 2\n"
-    )
+    (tmp_path / "x.py").write_text("def new_name():\n    return 2\n")
 
     subprocess.run(
         ["git", "-C", str(tmp_path), "add", "."],

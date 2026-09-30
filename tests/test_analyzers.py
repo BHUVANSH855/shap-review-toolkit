@@ -16,7 +16,4 @@ def test_shap_semantic_analyzer(tmp_path: Path):
     findings = SHAPSemanticAnalyzer().analyze(tmp_path)
 
     assert findings
-    assert any(
-        finding.invariant == "INV-ATTR-001"
-        for finding in findings
-    )
+    assert any(finding.invariant == "INV-ATTR-001" for finding in findings)

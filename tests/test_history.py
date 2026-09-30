@@ -109,6 +109,7 @@ def test_history_issue_before_after_snapshot(tmp_path: Path):
     assert result["file_diffs"][0]["changed"]
     assert result["file_diffs"][0]["before_lines"] == 1
 
+
 def test_finding_classification():
     from shap_review.evidence.provenance import classify_finding
 

@@ -41,7 +41,6 @@ def dtype_tolerance(dtype) -> float:
     return _DEFAULT_TOLERANCE
 
 
-
 @dataclass(frozen=True)
 class SHAPContract:
     explainer: str
@@ -69,7 +68,6 @@ class SHAPContract:
     metadata: dict[str, Any] = field(default_factory=dict)
     axis_spec: SHAPAxisSpec | None = None
 
-
     def resolved_tolerance(self, dtype=None) -> float:
         """Return effective tolerance, applying dtype-adaptive defaults when tolerance is None."""
         if self.tolerance is not None:
@@ -78,7 +76,7 @@ class SHAPContract:
 
     def to_dict(self):
         d = asdict(self)
-        d['tolerance_default_policy'] = 'dtype-adaptive when tolerance is None'
+        d["tolerance_default_policy"] = "dtype-adaptive when tolerance is None"
         return d
 
 
@@ -118,9 +116,7 @@ def validate_contract(
         "dtype": str(v.dtype),
         "effective_tolerance": effective_tolerance,
         "tolerance_source": (
-            "caller_supplied"
-            if original_tolerance is not None
-            else "dtype_adaptive"
+            "caller_supplied" if original_tolerance is not None else "dtype_adaptive"
         ),
     }
 

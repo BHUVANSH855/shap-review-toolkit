@@ -71,7 +71,9 @@ class BaseReviewAdapter:
     # Public interface
     # ------------------------------------------------------------------
 
-    def invoke(self, command: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    def invoke(
+        self, command: str, arguments: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Route ``command`` to the core engine and return a structured result.
 
         The response envelope always contains ``provider``, ``version``,
@@ -155,13 +157,13 @@ class BaseReviewAdapter:
             )
             return envelope
         except Exception as exc:
-            # Unexpected core engine failure.  Encode rather than propagate so
+            # Unexpected core engine failure. Encode rather than propagate so
             # the provider layer always receives a structured response.
             log.exception(
-                "[%s] command=%r unexpected engine failure: %s",
+                "[%s] command=%r unexpected engine failure",
                 self.provider,
                 command,
-                exc,
+                exc_info=exc,
             )
             envelope["error"] = self._error_payload(
                 "ENGINE_ERROR",
@@ -228,9 +230,7 @@ class BaseReviewAdapter:
         return None
 
     @staticmethod
-    def _error_payload(
-        kind: str, message: str, command: str
-    ) -> dict[str, Any]:
+    def _error_payload(kind: str, message: str, command: str) -> dict[str, Any]:
         """Return a structured error dict suitable for the response envelope."""
         return {
             "kind": kind,

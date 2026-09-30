@@ -21,6 +21,7 @@ def test_invalid_transition():
             FindingStatus.CONFIRMED,
         )
 
+
 def test_finding_classification():
     from shap_review.evidence.provenance import classify_finding
 
@@ -40,9 +41,7 @@ def test_evidence_gate_rejects_static_confirmation():
     from shap_review.findings.lifecycle import evidence_transition
     from shap_review.types import FindingStatus
 
-    chain = EvidenceChain(
-        [EvidenceItem(EvidenceKind.STATIC, "x", "candidate", True)]
-    )
+    chain = EvidenceChain([EvidenceItem(EvidenceKind.STATIC, "x", "candidate", True)])
 
     with pytest.raises(ValueError):
         evidence_transition(
@@ -51,12 +50,16 @@ def test_evidence_gate_rejects_static_confirmation():
             chain,
         )
 
+
 def test_historical_and_novel_reproduction_are_classified_by_provenance():
     from shap_review.evidence.provenance import classify_finding
 
-    assert classify_finding(
-        historical_issue="4911", reproduced=True, discovered_by_current_analysis=False
-    ).value == "historical_reproduction"
+    assert (
+        classify_finding(
+            historical_issue="4911",
+            reproduced=True,
+            discovered_by_current_analysis=False,
+        ).value
+        == "historical_reproduction"
+    )
     assert classify_finding(reproduced=True).value == "novel_reproduction"
-
-

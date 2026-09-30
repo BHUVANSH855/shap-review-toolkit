@@ -66,9 +66,7 @@ class TreeExplainerFuzzer:
             "shap_version": getattr(shap, "__version__", None),
             "shap_source_path": source_path,
             "shap_source_root": (
-                str(Path(source_path).resolve().parent)
-                if source_path
-                else None
+                str(Path(source_path).resolve().parent) if source_path else None
             ),
             "python_executable": sys.executable,
             "python_version": platform.python_version(),
@@ -86,13 +84,14 @@ class TreeExplainerFuzzer:
         )
         return hashlib.sha256(encoded.encode()).hexdigest()
 
-    def _campaign_provenance(self) -> dict[str, Any]:
+    def _campaign_provenance(self, iterations: int) -> dict[str, Any]:
         runtime = self._runtime_provenance()
         payload = {
             **runtime,
             "seed": self.seed,
             "producer": "treeexplainer-fuzzer",
             "case_timeout": self.case_timeout,
+            "iterations": iterations,
         }
         return {
             **payload,
@@ -102,6 +101,7 @@ class TreeExplainerFuzzer:
     def _run_case_with_timeout(self, case: dict) -> dict:
         """Run case with a per-iteration timeout using ThreadPoolExecutor."""
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(run_case, case)
             try:
@@ -125,7 +125,7 @@ class TreeExplainerFuzzer:
         return hashlib.sha256(f"{exc_type}:{msg_prefix}".encode()).hexdigest()[:16]
 
     def run(self, iterations: int = 10):
-        campaign_provenance = self._campaign_provenance()
+        campaign_provenance = self._campaign_provenance(iterations)
         execution_id = hashlib.sha256(
             (
                 f"treeexplainer:{self.seed}:{iterations}:"
@@ -181,23 +181,17 @@ class TreeExplainerFuzzer:
 
             results.append(item)
 
-        executed = [
-            result
-            for result in results
-            if result["execution"].get("executed")
-        ]
+        executed = [result for result in results if result["execution"].get("executed")]
 
         return {
             "iterations": iterations,
             "results": results,
             "executed_cases": len(executed),
             "validated_cases": sum(
-                result["oracle"].get("valid", False)
-                for result in results
+                result["oracle"].get("valid", False) for result in results
             ),
             "failures": sum(
-                not result["oracle"].get("valid", False)
-                for result in results
+                not result["oracle"].get("valid", False) for result in results
             ),
             "unique_failures": len(seen_failure_fingerprints),
             "duplicate_failures": duplicate_failures,
@@ -206,8 +200,7 @@ class TreeExplainerFuzzer:
             ),
             "case_timeout_seconds": self.case_timeout,
             "skipped_cases": sum(
-                bool(result["execution"].get("skipped"))
-                for result in results
+                bool(result["execution"].get("skipped")) for result in results
             ),
             "coverage": self.coverage(results),
             "provenance": {
@@ -243,10 +236,7 @@ class TreeExplainerFuzzer:
 
         for field in fields:
             values = sorted(
-                {
-                    str(result["execution_trace"][field])
-                    for result in results
-                }
+                {str(result["execution_trace"][field]) for result in results}
             )
             coverage[field] = {
                 "observed": values,

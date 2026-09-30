@@ -40,7 +40,12 @@ class EvidenceRecord:
         if not self.id or not self.id.startswith("SHAP-EVID-"):
             errors.append("id must start with SHAP-EVID-")
         if self.type not in {
-            "issue", "documentation", "paper", "pull_request", "test", "architecture",
+            "issue",
+            "documentation",
+            "paper",
+            "pull_request",
+            "test",
+            "architecture",
         }:
             errors.append("unsupported evidence type")
         if not self.title:
@@ -190,7 +195,8 @@ class EvidenceCorpus:
             except (OSError, json.JSONDecodeError) as exc:
                 log.warning(
                     "EvidenceCorpus: skipping %s — could not read/parse: %s",
-                    p.name, exc,
+                    p.name,
+                    exc,
                 )
                 load_errors.append(str(p.name))
                 continue
@@ -204,7 +210,9 @@ class EvidenceCorpus:
                 log.warning(
                     "EvidenceCorpus: skipping malformed canonical record %s — %s: %s. "
                     "This file is part of the evidence trust anchor and should be fixed.",
-                    p.name, type(exc).__name__, exc,
+                    p.name,
+                    type(exc).__name__,
+                    exc,
                 )
                 load_errors.append(str(p.name))
 
@@ -213,7 +221,8 @@ class EvidenceCorpus:
                 log.warning(
                     "EvidenceCorpus: no valid SHAP-EVID-* records loaded from %s "
                     "(%d files had errors); falling back to DEFAULT_EVIDENCE.",
-                    directory, len(load_errors),
+                    directory,
+                    len(load_errors),
                 )
             return cls(DEFAULT_EVIDENCE)
 

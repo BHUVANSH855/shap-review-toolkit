@@ -147,7 +147,9 @@ class SHAPSemanticTensor:
         return reconstructed + base
 
 
-def _project_axes_after_reduction(axes: SHAPAxisSpec, *, interaction: bool) -> SHAPAxisSpec:
+def _project_axes_after_reduction(
+    axes: SHAPAxisSpec, *, interaction: bool
+) -> SHAPAxisSpec:
     """Project canonical axes after feature/interaction axes are reduced.
 
     SHAP reconstruction removes the feature axis (or both interaction feature
@@ -156,13 +158,17 @@ def _project_axes_after_reduction(axes: SHAPAxisSpec, *, interaction: bool) -> S
     ``n_samples == n_outputs`` ambiguity from being mistaken for a real
     baseline contract failure.
     """
-    removed = set(axes.interaction_feature_axes or ()) if interaction else {axes.feature_axis}
+    removed = (
+        set(axes.interaction_feature_axes or ()) if interaction else {axes.feature_axis}
+    )
 
     def project(axis: int | None) -> int | None:
         if axis is None:
             return None
         if axis in removed:
-            raise ValueError("a semantic sample/output axis cannot also be a reduced feature axis")
+            raise ValueError(
+                "a semantic sample/output axis cannot also be a reduced feature axis"
+            )
         return axis - sum(1 for r in removed if r < axis)
 
     return SHAPAxisSpec(
@@ -375,11 +381,7 @@ def semantic_align(
                 else (
                     "output"
                     if i == spec.output_axis
-                    else (
-                        "class"
-                        if i == spec.class_axis
-                        else "non-feature-semantic"
-                    )
+                    else ("class" if i == spec.class_axis else "non-feature-semantic")
                 )
             )
         )

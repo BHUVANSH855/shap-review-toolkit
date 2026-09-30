@@ -25,6 +25,7 @@ def test_canonical_distribution_contract():
     assert len(CAPABILITIES) == 24
     assert "evidence" in CAPABILITIES
 
+
 def test_release_metadata_is_synchronized():
     import json
     from pathlib import Path
@@ -56,9 +57,3 @@ def test_cli_capability_contract_exposes_current_commands():
     result = dispatch("capabilities")
     assert "fuzz-protocol" in result["commands"]
     assert "semantic-oracle" in result["commands"]
-
-
-
-
-
-

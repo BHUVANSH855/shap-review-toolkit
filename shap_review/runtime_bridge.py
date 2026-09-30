@@ -148,8 +148,7 @@ def run_bridge(
         }
 
     execution_id = hashlib.sha256(
-        f"runtime-bridge:{seed}:{iterations}:{provenance['environment_fingerprint']}"
-        .encode()
+        f"runtime-bridge:{seed}:{iterations}:{provenance['environment_fingerprint']}".encode()
     ).hexdigest()
 
     results: list[dict[str, Any]] = []
@@ -375,9 +374,7 @@ def attach_dynamic_evidence(
                 "input_fingerprint": provenance.get("input_fingerprint"),
                 "candidate_fingerprint": provenance.get("candidate_fingerprint"),
                 "repository_revision": provenance.get("repository_revision"),
-                "environment_fingerprint": provenance.get(
-                    "environment_fingerprint"
-                ),
+                "environment_fingerprint": provenance.get("environment_fingerprint"),
                 "shap_source_path": provenance.get("shap_source_path"),
                 "shap_version": provenance.get("shap_version"),
                 "python_executable": provenance.get("python_executable"),
@@ -390,19 +387,13 @@ def attach_dynamic_evidence(
 
         existing_entries = [
             {
-                "kind": (
-                    item.kind.value
-                    if hasattr(item.kind, "value")
-                    else item.kind
-                ),
+                "kind": (item.kind.value if hasattr(item.kind, "value") else item.kind),
                 "source": item.source,
                 "claim": item.claim,
                 "passed": item.passed,
                 "confidence": item.confidence,
                 "origin": (
-                    item.origin.value
-                    if hasattr(item.origin, "value")
-                    else item.origin
+                    item.origin.value if hasattr(item.origin, "value") else item.origin
                 ),
                 "evidence_id": item.evidence_id,
             }
@@ -446,8 +437,7 @@ def attach_dynamic_evidence(
                 validation_required=candidate.validation_required,
                 confidence=new_confidence,
                 tags=sorted(
-                    set(candidate.tags)
-                    | {"dynamic-evidence", "runtime-bridge"}
+                    set(candidate.tags) | {"dynamic-evidence", "runtime-bridge"}
                 ),
                 evidence_chain=new_chain,
             )

@@ -150,11 +150,7 @@ def correlate_boundary(path, boundary_line, radius=80):
         None,
     )
 
-    relevant = [
-        fact
-        for fact in facts
-        if abs(fact.line - boundary_line) <= radius
-    ]
+    relevant = [fact for fact in facts if abs(fact.line - boundary_line) <= radius]
 
     function = (
         boundary.function
@@ -165,11 +161,7 @@ def correlate_boundary(path, boundary_line, radius=80):
         )
     )
 
-    same = [
-        fact
-        for fact in relevant
-        if fact.function == function
-    ]
+    same = [fact for fact in relevant if fact.function == function]
 
     symbol = boundary.symbol if boundary else None
 
@@ -184,31 +176,19 @@ def correlate_boundary(path, boundary_line, radius=80):
     ]
 
     errors = [
-        fact
-        for fact in same
-        if fact.kind == "error-path" and fact.line > boundary_line
+        fact for fact in same if fact.kind == "error-path" and fact.line > boundary_line
     ]
 
     return {
         "boundary_line": boundary_line,
         "function": function,
         "symbol": symbol,
-        "before": [
-            fact.to_dict()
-            for fact in same
-            if fact.line < boundary_line
-        ],
-        "after": [
-            fact.to_dict()
-            for fact in same
-            if fact.line >= boundary_line
-        ],
+        "before": [fact.to_dict() for fact in same if fact.line < boundary_line],
+        "after": [fact.to_dict() for fact in same if fact.line >= boundary_line],
         "lifetime_after_boundary": bool(lifetime),
         "error_after_boundary": bool(errors),
         "validation_before_boundary": any(
-            fact.kind == "validation"
-            and fact.line < boundary_line
-            for fact in same
+            fact.kind == "validation" and fact.line < boundary_line for fact in same
         ),
         "same_function": boundary is not None,
         "analysis_mode": "triage",
@@ -223,10 +203,7 @@ def correlate_boundary(path, boundary_line, radius=80):
         "requires_runtime_or_control_flow_validation": True,
         "component_hints": (
             ["cutils", "cext", "cext-gpu"]
-            if any(
-                component in str(path)
-                for component in ("shap/cutils", "shap/cext")
-            )
+            if any(component in str(path) for component in ("shap/cutils", "shap/cext"))
             else []
         ),
     }

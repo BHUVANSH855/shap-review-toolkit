@@ -130,10 +130,7 @@ class EvidenceChain:
     def _scoring_eligible(item: EvidenceItem) -> bool:
         """Return whether an item is eligible to participate in scoring."""
         validation = validate_evidence_item(item)
-        return bool(
-            validation.scoring_eligible
-            and item.intrinsically_valid
-        )
+        return bool(validation.scoring_eligible and item.intrinsically_valid)
 
     def independent_items(self) -> list[EvidenceItem]:
         """Return the subset of items that are pairwise independent.
@@ -151,11 +148,7 @@ class EvidenceChain:
         Always use ``build_chain()`` to construct evidence chains so that
         pairwise correlation is correctly detected.
         """
-        eligible = [
-            item
-            for item in self.items
-            if self._scoring_eligible(item)
-        ]
+        eligible = [item for item in self.items if self._scoring_eligible(item)]
 
         if self.graph is None:
             # Conservative fallback: return at most one item to prevent
@@ -259,7 +252,6 @@ class EvidenceChain:
                 "in scoring (conservative fallback). Always use build_chain()."
             ),
             "score_semantics": (
-                "Heuristic evidence-strength score for prioritization, "
-                "not probability."
+                "Heuristic evidence-strength score for prioritization, not probability."
             ),
         }

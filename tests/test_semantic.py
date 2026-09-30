@@ -69,9 +69,7 @@ def test_interaction_oracle_requires_symmetry_and_reconstruction():
     from shap_review.contracts.oracles import InteractionOracle
 
     values = np.array([[3.0, 5.0]])
-    interaction_values = np.array(
-        [[[1.0, 2.0], [2.0, 3.0]]]
-    )
+    interaction_values = np.array([[[1.0, 2.0], [2.0, 3.0]]])
 
     result = InteractionOracle().check(
         values=values,
@@ -163,12 +161,8 @@ def test_differential_agreement_is_not_correctness(tmp_path: Path):
     reference = tmp_path / "reference.py"
     target = tmp_path / "target.py"
 
-    reference.write_text(
-        'import json; print(json.dumps({"values":[1.0]}))'
-    )
-    target.write_text(
-        'import json; print(json.dumps({"values":[1.0]}))'
-    )
+    reference.write_text('import json; print(json.dumps({"values":[1.0]}))')
+    target.write_text('import json; print(json.dumps({"values":[1.0]}))')
 
     result = differential_scripts(reference, target)
 
@@ -187,8 +181,7 @@ def test_api_alias_reassignment_invalidates():
     )
 
     assert not any(
-        finding["api"] == "Explainer.__call__"
-        for finding in scan_api_era(source)
+        finding["api"] == "Explainer.__call__" for finding in scan_api_era(source)
     )
 
 
@@ -211,10 +204,7 @@ def test_api_scope_isolated():
         if finding["api"] == "Explainer.__call__"
     ]
 
-    assert len(calls) == 0 or all(
-        finding["scope"] == "foo"
-        for finding in calls
-    )
+    assert len(calls) == 0 or all(finding["scope"] == "foo" for finding in calls)
 
 
 def test_conditional_api_has_medium_confidence():
@@ -232,8 +222,7 @@ def test_conditional_api_has_medium_confidence():
     findings = scan_api_era(source)
 
     assert any(
-        finding["api"] == "Explainer.__call__"
-        and finding["confidence"] == "medium"
+        finding["api"] == "Explainer.__call__" and finding["confidence"] == "medium"
         for finding in findings
     )
 
@@ -251,11 +240,7 @@ def foo():
 
     findings = scan_api_era(source)
 
-    calls = [
-        finding
-        for finding in findings
-        if finding["api"] == "Explainer.__call__"
-    ]
+    calls = [finding for finding in findings if finding["api"] == "Explainer.__call__"]
 
     assert calls
     assert calls[0]["scope"] == "inner"
@@ -273,9 +258,7 @@ e(X)
     findings = scan_api_era(source)
 
     assert not [
-        finding
-        for finding in findings
-        if finding["api"] == "Explainer.__call__"
+        finding for finding in findings if finding["api"] == "Explainer.__call__"
     ]
 
 
@@ -305,6 +288,7 @@ def test_input_mutation_oracle_is_registered():
 
     assert "InputMutationOracle" in ORACLE_REGISTRY
 
+
 def test_native_flow_detects_lifetime_after_boundary(tmp_path: Path):
     from shap_review.semantic.native_flow import correlate_boundary
 
@@ -323,6 +307,7 @@ void f(PyObject* x) {
     result = correlate_boundary(path, 3)
 
     assert result["lifetime_after_boundary"] is True
+
 
 def test_native_flow_associates_symbol(tmp_path: Path):
     from shap_review.semantic.native_flow import correlate_boundary
@@ -366,19 +351,14 @@ def test_native_flow_marks_heuristic_results_as_not_proven(tmp_path: Path):
     assert result["requires_runtime_or_control_flow_validation"] is True
     assert result["lifetime_after_boundary"] is True
 
+
 def test_api_era_scanner():
     from shap_review.semantic.api_era import scan_api_era
 
-    findings = scan_api_era(
-        "explainer.shap_values(X)\n"
-        "shap.Explainer(model)(X)"
-    )
+    findings = scan_api_era("explainer.shap_values(X)\nshap.Explainer(model)(X)")
 
     assert any(finding["era"] == "legacy" for finding in findings)
-    assert any(
-        finding["api"] == "Explainer.__call__"
-        for finding in findings
-    )
+    assert any(finding["api"] == "Explainer.__call__" for finding in findings)
 
 
 def test_native_map_has_expected_layers(tmp_path: Path):
@@ -390,12 +370,11 @@ def test_native_map_has_expected_layers(tmp_path: Path):
     result = map_shap_native(str(tmp_path))
 
     names = {
-        component["name"]
-        for component in result["components"]
-        if component["present"]
+        component["name"] for component in result["components"] if component["present"]
     }
 
     assert {"cutils", "cext"} <= names
+
 
 def test_interaction_multiclass_uses_feature_pair_axes_before_output_axis():
     """InteractionOracle with values==interaction_values (same ndim) is INCONCLUSIVE.
@@ -487,7 +466,10 @@ def test_api_era_conditional_callable_has_medium_confidence():
 
     source = "import shap\nif flag:\n e=shap.TreeExplainer(model)\nelse:\n e=other_factory()\ne(X)\n"
     findings = scan_api_era(source)
-    assert any(f["api"] == "Explainer.__call__" and f["confidence"] == "medium" for f in findings)
+    assert any(
+        f["api"] == "Explainer.__call__" and f["confidence"] == "medium"
+        for f in findings
+    )
 
 
 def test_api_era_nested_scope_is_preserved():
@@ -544,6 +526,7 @@ def test_native_map_reports_source_symbols(tmp_path):
 # M-7: SemanticIRBuilder native pattern matching is word-bounded
 # ---------------------------------------------------------------------------
 
+
 def test_semantic_ir_builder_does_not_match_pyerr_compound_name(tmp_path):
     """Word-bounded regex must not fire on PyErr_ as part of a compound identifier.
 
@@ -574,9 +557,7 @@ def test_semantic_ir_builder_does_not_match_pyerr_compound_name(tmp_path):
         "notPyErr_SetString (compound name) must NOT produce a NativeBoundary — "
         "word-bounded regex should prevent this false positive"
     )
-    assert 2 in line_numbers, (
-        "Real PyErr_Clear() call MUST produce a NativeBoundary"
-    )
+    assert 2 in line_numbers, "Real PyErr_Clear() call MUST produce a NativeBoundary"
 
 
 def test_semantic_ir_builder_does_not_match_pyerr_in_string_literal(tmp_path):
@@ -605,10 +586,7 @@ def test_semantic_ir_builder_enclosing_is_innermost(tmp_path):
 
     py = tmp_path / "nested.py"
     py.write_text(
-        "def outer():\n"
-        "    def inner():\n"
-        "        x = some_call()\n"
-        "    inner()\n",
+        "def outer():\n    def inner():\n        x = some_call()\n    inner()\n",
         encoding="utf-8",
     )
     ir = SemanticIRBuilder().build(tmp_path)
@@ -626,8 +604,7 @@ def test_semantic_ir_builder_nanobind_word_boundary(tmp_path):
 
     native = tmp_path / "ext.cpp"
     native.write_text(
-        "// notnanobind is not nanobind\n"
-        "#include <nanobind/nanobind.h>\n",
+        "// notnanobind is not nanobind\n#include <nanobind/nanobind.h>\n",
         encoding="utf-8",
     )
     ir = SemanticIRBuilder().build(tmp_path)
@@ -641,6 +618,7 @@ def test_semantic_ir_builder_nanobind_word_boundary(tmp_path):
 # ---------------------------------------------------------------------------
 # Fuzzing — per-case timeout and crash deduplication
 # ---------------------------------------------------------------------------
+
 
 def test_fuzzer_deduplicates_repeated_crashes():
     """Repeated identical crashes must produce unique_failures=1, not N."""
@@ -668,7 +646,9 @@ def test_fuzzer_deduplicates_repeated_crashes():
         def fake_evaluate(result):
             return {"valid": False}
 
-        with patch("shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate):
+        with patch(
+            "shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate
+        ):
             report = fuzzer.run(iterations=5)
 
     assert report["unique_failures"] == 1, (
@@ -701,7 +681,9 @@ def test_fuzzer_timeout_case_recorded_not_hanged():
         def fake_evaluate(result):
             return {"valid": False}
 
-        with patch("shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate):
+        with patch(
+            "shap_review.fuzzing.engine.evaluate_execution", side_effect=fake_evaluate
+        ):
             report = fuzzer.run(iterations=3)
 
     assert report["timeout_cases"] == 3
@@ -729,6 +711,7 @@ def test_default_case_timeout_is_reasonable():
 # ---------------------------------------------------------------------------
 # Public API surface
 # ---------------------------------------------------------------------------
+
 
 def test_public_api_exports_core_classes():
     """Top-level shap_review must export the documented public API."""
@@ -759,14 +742,13 @@ def test_public_api_all_contains_core_names():
     import shap_review
 
     for name in ("SHAPContract", "EvidenceChain", "OracleStatus", "dtype_tolerance"):
-        assert name in shap_review.__all__, (
-            f"{name!r} must be in shap_review.__all__"
-        )
+        assert name in shap_review.__all__, f"{name!r} must be in shap_review.__all__"
 
 
 # ---------------------------------------------------------------------------
 # Markdown report template
 # ---------------------------------------------------------------------------
+
 
 def test_markdown_report_evidence_heading_is_valid():
     """render_candidates must produce valid bold markdown for Evidence heading."""
@@ -774,8 +756,17 @@ def test_markdown_report_evidence_heading_is_valid():
     from shap_review.types import Candidate, EvidenceRef
 
     c = Candidate(
-        "CAND-1", "SHAP-01", "INV-001", "a.py", 1, None,
-        "test", [EvidenceRef("source", "src", "note", 2)], True, "low", [],
+        "CAND-1",
+        "SHAP-01",
+        "INV-001",
+        "a.py",
+        1,
+        None,
+        "test",
+        [EvidenceRef("source", "src", "note", 2)],
+        True,
+        "low",
+        [],
     )
     output = render_candidates([c])
 
@@ -784,9 +775,10 @@ def test_markdown_report_evidence_heading_is_valid():
         "Evidence line must be '- **Evidence:**' (with closing **)"
     )
     # Must NOT contain unclosed bold marker.
-    assert "- **Evidence:\"" not in output
+    assert '- **Evidence:"' not in output
     # Bold must be balanced (no orphaned **).
     import re
+
     bold_markers = re.findall(r"\*\*", output)
     assert len(bold_markers) % 2 == 0, (
         f"Unbalanced bold markers in report output: found {len(bold_markers)} '**'"

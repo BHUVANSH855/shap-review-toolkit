@@ -101,11 +101,7 @@ def build_chain(
         progressed = False
 
         for item in pending[:]:
-            parents = tuple(
-                parent
-                for parent in item.derived_from
-                if parent in ids
-            )
+            parents = tuple(parent for parent in item.derived_from if parent in ids)
 
             if not all(parent in graph.nodes for parent in parents):
                 continue
@@ -141,11 +137,7 @@ def build_chain(
                 item.claim,
                 item.passed,
                 item.confidence,
-                tuple(
-                    parent
-                    for parent in item.derived_from
-                    if parent in graph.nodes
-                ),
+                tuple(parent for parent in item.derived_from if parent in graph.nodes),
                 item.execution_id,
                 item.repository_revision,
                 (
