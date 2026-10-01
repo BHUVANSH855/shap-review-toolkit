@@ -39,7 +39,10 @@ def test_release_metadata_is_synchronized():
         (root / "plugins/shap-review-toolkit/.claude-plugin/plugin.json").read_text()
     )
     assert plugin["version"] == VERSION
-    assert "fuzz-protocol" in plugin["commands"]
+    # Commands live in the commands/ directory, not in plugin.json
+    # (Claude Code schema does not allow commands array in plugin.json)
+    commands_dir = root / "plugins/shap-review-toolkit/commands"
+    assert (commands_dir / "fuzz-protocol.md").exists(), "fuzz-protocol command missing"
 
 
 def test_cli_reports_canonical_metadata():
