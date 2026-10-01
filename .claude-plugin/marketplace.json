@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "shap-review-toolkit",
-  "version": "0.0.1",
+  "version": "0.0.0.dev0",
   "description": "Evidence-driven semantic review toolkit for SHAP: 12 specialized agents and 16 commands for additivity auditing, native boundary analysis, differential testing, TreeExplainer fuzzing, and upstream-quality finding generation.",
   "owner": {
     "name": "BHUVANSH855",
@@ -12,7 +12,7 @@
       "name": "shap-review-toolkit",
       "description": "12 specialized agents and 16 commands for reviewing SHAP.",
       "source": "./plugins/shap-review-toolkit",
-      "version": "0.0.1",
+      "version": "0.0.0.dev0",
       "category": "code-quality",
       "keywords": [
         "shap",
