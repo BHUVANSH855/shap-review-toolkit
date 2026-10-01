@@ -4,31 +4,5 @@
   "description": "Evidence-driven semantic review toolkit for SHAP",
   "author": {
     "name": "BHUVANSH855"
-  },
-  "commands": [
-    "map",
-    "health",
-    "analyze",
-    "report",
-    "hotspots",
-    "explore",
-    "investigate",
-    "reproduce",
-    "fuzz",
-    "fuzz-treeexplainer",
-    "fuzz-protocol",
-    "fuzz-backends",
-    "differential",
-    "cpu-gpu-differential",
-    "regressions",
-    "history",
-    "sanitizer",
-    "differential-versions",
-    "evidence",
-    "semantic-oracle",
-    "native-map",
-    "api-era",
-    "capabilities",
-    "version"
-  ]
+  }
 }
